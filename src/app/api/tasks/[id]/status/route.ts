@@ -114,6 +114,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const freepikData = await freepikRes.json();
 
+    // Debug log — helps diagnose response structure issues
+    console.log(`[Poll ${taskId}] Freepik HTTP ${freepikRes.status}:`, JSON.stringify(freepikData).slice(0, 500));
+
     if (!freepikRes.ok) {
       // Don't mark as failed immediately for temporary API errors
       return NextResponse.json({ data: task });
@@ -125,10 +128,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (remoteTask.status === 'COMPLETED' || remoteTask.status === 'completed' || remoteTask.status === 'success') {
       newStatus = 'success';
-      resultUrl = remoteTask.video?.url || remoteTask.result?.video?.url || remoteTask.url || null;
+      // Freepik returns generated video URLs in the `generated` array
+      resultUrl = (Array.isArray(remoteTask.generated) && remoteTask.generated.length > 0)
+        ? remoteTask.generated[0]
+        : remoteTask.video?.url || remoteTask.result?.video?.url || remoteTask.url || null;
+      console.log(`[Poll ${taskId}] Extracted resultUrl:`, resultUrl);
     } else if (remoteTask.status === 'FAILED' || remoteTask.status === 'failed' || remoteTask.status === 'error') {
       newStatus = 'failed';
     } else {
+      // CREATED, IN_PROGRESS, etc.
       newStatus = 'processing';
     }
 
