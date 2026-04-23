@@ -4,11 +4,10 @@ import { useRef, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from "next/navigation";
 import {
   UploadCloud, Image as ImageIcon, Video as VideoIcon, Loader2,
   CheckCircle2, X, Terminal, ChevronUp, ChevronDown,
-  Circle, XCircle, Sparkles
+  Circle, XCircle, Sparkles, Download, Play, RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -200,6 +199,152 @@ function ProcessMonitor({
   );
 }
 
+// ─── Result Section Component ─────────────────────────────────────────
+function ResultSection() {
+  const pollingStatus = useGenerateStore((s) => s.pollingStatus);
+  const resultVideoUrl = useGenerateStore((s) => s.resultVideoUrl);
+  const activeTaskId = useGenerateStore((s) => s.activeTaskId);
+  const clearResult = useGenerateStore((s) => s.clearResult);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  if (pollingStatus === "idle" && !activeTaskId) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="h-px bg-border/30" />
+
+      {/* Polling / Loading state */}
+      {pollingStatus === "polling" && (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-sm p-6 md:p-8">
+          <div className="flex flex-col items-center justify-center text-center gap-4">
+            {/* Animated spinner */}
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-2 border-blue-500/20" />
+              <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-transparent border-t-blue-400 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Play className="w-5 h-5 text-blue-400 ml-0.5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Generating your video...
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                This usually takes 1–3 minutes. Please wait.
+              </p>
+            </div>
+            {/* Pulsing dots */}
+            <div className="flex gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Completed / Video result */}
+      {pollingStatus === "completed" && resultVideoUrl && (
+        <div className="rounded-xl border border-green-500/20 bg-card/30 backdrop-blur-sm overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <span className="text-sm font-medium text-green-300">
+              Video Generated Successfully!
+            </span>
+          </div>
+
+          {/* Video Player */}
+          <div className="relative bg-black">
+            <video
+              ref={videoRef}
+              src={resultVideoUrl}
+              className="w-full max-h-[70vh] object-contain cursor-pointer"
+              controls
+              autoPlay
+              loop
+              playsInline
+              muted
+              onClick={() => {
+                // Toggle fullscreen on click
+                if (videoRef.current) {
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                  } else {
+                    videoRef.current.requestFullscreen().catch(() => {});
+                  }
+                }
+              }}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="px-4 py-3 flex flex-col sm:flex-row gap-3 border-t border-border/30">
+            <a
+              href={resultVideoUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button
+                type="button"
+                size="lg"
+                className="w-full bg-white text-black hover:bg-white/90 font-medium gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Video
+              </Button>
+            </a>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              className="flex-1 border-border/50 bg-transparent hover:bg-white/5 gap-2"
+              onClick={clearResult}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Generate New
+            </Button>
+          </div>
+
+          <div className="px-4 pb-3">
+            <p className="text-[10px] text-muted-foreground text-center">
+              Tip: Click the video to go fullscreen. Download before auto-deletion.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Failed state */}
+      {pollingStatus === "failed" && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-6 md:p-8">
+          <div className="flex flex-col items-center justify-center text-center gap-4">
+            <XCircle className="w-12 h-12 text-red-400" />
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Video generation failed
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Something went wrong on the Freepik side. Please try again.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-border/50 bg-transparent hover:bg-white/5 gap-2"
+              onClick={clearResult}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────
 const generateSchema = z.object({
   prompt: z.string().max(2500, "Prompt cannot exceed 2500 characters").optional(),
@@ -208,8 +353,6 @@ const generateSchema = z.object({
 });
 
 export default function GenerateVideoPage() {
-  const router = useRouter();
-
   // All state from global store (survives navigation!)
   const videoFile = useGenerateStore((s) => s.videoFile);
   const imageFile = useGenerateStore((s) => s.imageFile);
@@ -222,10 +365,12 @@ export default function GenerateVideoPage() {
   const monitorOpen = useGenerateStore((s) => s.monitorOpen);
   const setMonitorOpen = useGenerateStore((s) => s.setMonitorOpen);
   const runGeneration = useGenerateStore((s) => s.runGeneration);
-  const resetPipeline = useGenerateStore((s) => s.resetPipeline);
+  const activeTaskId = useGenerateStore((s) => s.activeTaskId);
+  const pollingStatus = useGenerateStore((s) => s.pollingStatus);
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const resultSectionRef = useRef<HTMLDivElement>(null);
 
   // Preview URLs (derived from store files)
   const videoPreviewUrl = useMemo(
@@ -246,20 +391,40 @@ export default function GenerateVideoPage() {
     },
   });
 
+  // Auto-scroll to result section when generation starts or completes
+  useEffect(() => {
+    if (pollingStatus === "polling" || pollingStatus === "completed") {
+      // Small delay so the DOM renders first
+      setTimeout(() => {
+        resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, [pollingStatus]);
+
+  // Also scroll when submitting starts
+  useEffect(() => {
+    if (isSubmitting) {
+      setTimeout(() => {
+        resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 200);
+    }
+  }, [isSubmitting]);
+
+  const hasActiveTask = !!activeTaskId;
+  const isGenerating = isSubmitting || pollingStatus === "polling";
+
   async function onSubmit(values: z.infer<typeof generateSchema>) {
     if (!videoFile || !imageFile) {
       toast.error("Both a reference video AND a character image are required.");
       return;
     }
 
-    runGeneration(values, () => {
-      toast.success("Task added to queue successfully!");
-      // Reset files after successful generation
-      setVideoFile(null);
-      setImageFile(null);
-      resetPipeline();
-      router.push("/dashboard/tasks");
-    });
+    if (hasActiveTask) {
+      toast.error("Please wait for the current generation to finish before starting a new one.");
+      return;
+    }
+
+    runGeneration(values);
   }
 
   return (
@@ -272,17 +437,6 @@ export default function GenerateVideoPage() {
           Model: Kling v2.6 Motion Control std
         </p>
       </div>
-
-      {/* ═══ Process Monitor (always visible when active, even on return) ═══ */}
-      {showMonitor && (
-        <ProcessMonitor
-          steps={steps}
-          logs={logs}
-          isOpen={monitorOpen}
-          onToggle={() => setMonitorOpen(!monitorOpen)}
-          isRunning={isSubmitting}
-        />
-      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
@@ -320,7 +474,7 @@ export default function GenerateVideoPage() {
                         {videoFile.name}
                       </span>
                     </div>
-                    {!isSubmitting && (
+                    {!isGenerating && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -336,7 +490,9 @@ export default function GenerateVideoPage() {
                 </div>
               ) : (
                 <div
-                  className="border-2 border-dashed border-border/50 rounded-lg md:rounded-xl p-4 md:p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 aspect-[4/3]"
+                  className={`border-2 border-dashed border-border/50 rounded-lg md:rounded-xl p-4 md:p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 aspect-[4/3] ${
+                    isGenerating ? "opacity-50 pointer-events-none" : ""
+                  }`}
                   onClick={() => videoInputRef.current?.click()}
                 >
                   <UploadCloud className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground mb-2" />
@@ -381,7 +537,7 @@ export default function GenerateVideoPage() {
                         {imageFile.name}
                       </span>
                     </div>
-                    {!isSubmitting && (
+                    {!isGenerating && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -397,7 +553,9 @@ export default function GenerateVideoPage() {
                 </div>
               ) : (
                 <div
-                  className="border-2 border-dashed border-border/50 rounded-lg md:rounded-xl p-4 md:p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 aspect-[4/3]"
+                  className={`border-2 border-dashed border-border/50 rounded-lg md:rounded-xl p-4 md:p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 aspect-[4/3] ${
+                    isGenerating ? "opacity-50 pointer-events-none" : ""
+                  }`}
                   onClick={() => imageInputRef.current?.click()}
                 >
                   <UploadCloud className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground mb-2" />
@@ -504,37 +662,22 @@ export default function GenerateVideoPage() {
           </Card>
 
           {/* ═══ Submit Button ═══ */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-end">
-            {/* Mobile: toggle process view button */}
-            {showMonitor && !monitorOpen && (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="md:hidden border-border/50 bg-transparent hover:bg-white/5 gap-2"
-                onClick={() => setMonitorOpen(true)}
-              >
-                <Terminal className="w-4 h-4" />
-                View Process
-                {isSubmitting && (
-                  <span className="relative flex h-2 w-2 ml-1">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-                  </span>
-                )}
-              </Button>
-            )}
-
+          <div className="flex flex-col items-stretch gap-3">
             <Button
               type="submit"
               size="lg"
-              className="bg-white text-black hover:bg-white/90 font-medium px-8 w-full md:w-auto gap-2 relative overflow-hidden group"
-              disabled={isSubmitting}
+              className="bg-white text-black hover:bg-white/90 font-medium px-8 w-full gap-2 relative overflow-hidden group"
+              disabled={isGenerating || hasActiveTask}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Processing...
+                </>
+              ) : hasActiveTask ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Waiting for result...
                 </>
               ) : (
                 <>
@@ -543,9 +686,31 @@ export default function GenerateVideoPage() {
                 </>
               )}
             </Button>
+
+            {hasActiveTask && !isSubmitting && (
+              <p className="text-xs text-center text-muted-foreground">
+                You can only run 1 generation at a time. Please wait for it to finish.
+              </p>
+            )}
           </div>
         </form>
       </Form>
+
+      {/* ═══ Process Monitor (below generate button, minimized by default) ═══ */}
+      {showMonitor && (
+        <ProcessMonitor
+          steps={steps}
+          logs={logs}
+          isOpen={monitorOpen}
+          onToggle={() => setMonitorOpen(!monitorOpen)}
+          isRunning={isSubmitting}
+        />
+      )}
+
+      {/* ═══ Result Section (below everything) ═══ */}
+      <div ref={resultSectionRef}>
+        <ResultSection />
+      </div>
     </div>
   );
 }

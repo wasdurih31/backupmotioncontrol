@@ -1,7 +1,5 @@
 "use client";
 
-// import { getUrl } from "@vercel/blob"; // removed – use server API for signed URLs
-
 import { create } from "zustand";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -27,6 +25,8 @@ interface GenerateFormValues {
   cfg_scale: number;
 }
 
+export type PollingStatus = "idle" | "polling" | "completed" | "failed";
+
 interface GenerateState {
   // Files
   videoFile: File | null;
@@ -40,12 +40,18 @@ interface GenerateState {
   monitorOpen: boolean;
   isComplete: boolean;
 
+  // Result / Polling
+  activeTaskId: string | null;
+  resultVideoUrl: string | null;
+  pollingStatus: PollingStatus;
+
   // Actions
   setVideoFile: (f: File | null) => void;
   setImageFile: (f: File | null) => void;
   setMonitorOpen: (open: boolean) => void;
   resetPipeline: () => void;
-  runGeneration: (values: GenerateFormValues, onSuccess: () => void) => Promise<void>;
+  clearResult: () => void;
+  runGeneration: (values: GenerateFormValues) => Promise<void>;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -67,6 +73,8 @@ const INITIAL_STEPS: PipelineStep[] = [
   { id: "save_task", label: "Save Task to Database", status: "idle" },
 ];
 
+const POLL_INTERVAL_MS = 5000;
+
 // ─── Store ───────────────────────────────────────────────────────────
 export const useGenerateStore = create<GenerateState>((set, get) => ({
   videoFile: null,
@@ -75,8 +83,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   logs: [],
   isSubmitting: false,
   showMonitor: false,
-  monitorOpen: false,
+  monitorOpen: false, // minimized by default
   isComplete: false,
+
+  activeTaskId: null,
+  resultVideoUrl: null,
+  pollingStatus: "idle",
 
   setVideoFile: (f) => set({ videoFile: f }),
   setImageFile: (f) => set({ imageFile: f }),
@@ -92,9 +104,27 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       isComplete: false,
     }),
 
-  runGeneration: async (values, onSuccess) => {
-    const { videoFile, imageFile } = get();
+  clearResult: () =>
+    set({
+      activeTaskId: null,
+      resultVideoUrl: null,
+      pollingStatus: "idle",
+      steps: INITIAL_STEPS.map((s) => ({ ...s })),
+      logs: [],
+      isSubmitting: false,
+      showMonitor: false,
+      monitorOpen: false,
+      isComplete: false,
+      videoFile: null,
+      imageFile: null,
+    }),
+
+  runGeneration: async (values) => {
+    const { videoFile, imageFile, activeTaskId } = get();
     if (!videoFile || !imageFile) return;
+
+    // ── Block if there's already an active task (single queue) ──
+    if (activeTaskId) return;
 
     // Internal helpers that write to the store directly
     const addLog = (level: LogEntry["level"], message: string) => {
@@ -115,8 +145,11 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       logs: [],
       isSubmitting: true,
       showMonitor: true,
-      monitorOpen: true,
+      monitorOpen: false, // keep minimized
       isComplete: false,
+      resultVideoUrl: null,
+      pollingStatus: "idle",
+      activeTaskId: null,
     });
 
     try {
@@ -188,8 +221,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       updateStep("upload_image", "success", "Done");
       addLog("success", `✓ Image uploaded → ${imageBlobUrl.slice(0, 50)}...`);
 
-// Signed URLs are already provided by /api/upload response (private store)
-
       // ── Step 4: Verify API Key ──
       updateStep("verify_key", "running", "Checking...");
       addLog("info", "Verifying API key with server...");
@@ -213,19 +244,26 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           character_orientation: values.character_orientation,
           cfg_scale: values.cfg_scale,
         }),
-});
+      });
 
       const generateData = await generateRes.json();
 
-      if (!generateRes.ok || !generateData.success) {
+      if (!generateRes.ok) {
         const errMsg = generateData.error || `HTTP ${generateRes.status}`;
         updateStep("call_api", "error", errMsg);
         addLog("error", `✗ API Error: ${errMsg}`);
         throw new Error(errMsg);
       }
 
-      updateStep("call_api", "success", `Task ID: ${generateData.taskId?.slice(0, 8)}...`);
-      addLog("success", `✓ Task created → ${generateData.taskId}`);
+      const taskId = generateData.taskId;
+      if (!taskId) {
+        updateStep("call_api", "error", "No task ID returned");
+        addLog("error", "✗ No task ID in response");
+        throw new Error("No task ID returned from server");
+      }
+
+      updateStep("call_api", "success", `Task ID: ${taskId.slice(0, 8)}...`);
+      addLog("success", `✓ Task created → ${taskId}`);
 
       // ── Step 6: Save Task ──
       updateStep("save_task", "running", "Writing to DB...");
@@ -235,12 +273,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       updateStep("save_task", "success", "Saved");
       addLog("success", "════════════════════════════════════");
       addLog("success", "🎉 Generation queued successfully!");
+      addLog("info", "Waiting for Freepik to process your video...");
 
-      set({ isComplete: true });
+      set({ isComplete: true, activeTaskId: taskId, pollingStatus: "polling" });
 
-      // Delay then fire callback
-      await new Promise((r) => setTimeout(r, 1200));
-      onSuccess();
+      // ── Start polling for result ──
+      startPolling(taskId, set, get, addLog);
 
     } catch (error: any) {
       console.error(error);
@@ -254,3 +292,59 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     }
   },
 }));
+
+// ─── Polling Function (runs outside the store action) ────────────────
+function startPolling(
+  taskId: string,
+  set: (partial: Partial<GenerateState> | ((s: GenerateState) => Partial<GenerateState>)) => void,
+  get: () => GenerateState,
+  addLog: (level: LogEntry["level"], message: string) => void
+) {
+  let pollCount = 0;
+
+  const poll = async () => {
+    const state = get();
+    // Stop if cleared or a different task
+    if (state.activeTaskId !== taskId || state.pollingStatus !== "polling") return;
+
+    pollCount++;
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/status`);
+      if (!res.ok) {
+        addLog("warn", `Polling attempt ${pollCount} failed (HTTP ${res.status})`);
+        schedulePoll();
+        return;
+      }
+
+      const json = await res.json();
+      const task = json.data;
+
+      if (task.status === "success" && task.resultUrl) {
+        addLog("success", "════════════════════════════════════");
+        addLog("success", "🎬 Video generation complete!");
+        set({ pollingStatus: "completed", resultVideoUrl: task.resultUrl });
+        return; // stop polling
+      } else if (task.status === "failed") {
+        addLog("error", "✗ Video generation failed on Freepik side.");
+        set({ pollingStatus: "failed" });
+        return; // stop polling
+      } else {
+        // Still processing
+        if (pollCount % 6 === 0) {
+          addLog("info", `Still processing... (${Math.round(pollCount * POLL_INTERVAL_MS / 1000)}s elapsed)`);
+        }
+        schedulePoll();
+      }
+    } catch (e: any) {
+      addLog("warn", `Polling error: ${e.message}`);
+      schedulePoll();
+    }
+  };
+
+  const schedulePoll = () => {
+    setTimeout(poll, POLL_INTERVAL_MS);
+  };
+
+  // Initial poll after a short delay
+  setTimeout(poll, 3000);
+}

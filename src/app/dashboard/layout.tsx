@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Video, 
-  ListTodo, 
   Settings, 
   LogOut,
   ShieldCheck,
@@ -20,7 +19,6 @@ import { useGenerateStore } from "@/store/useGenerateStore";
 const navLinks = [
   { name: "Home", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Generate Video", shortName: "Generate", href: "/dashboard/generate", icon: Sparkles },
-  { name: "Tasks", shortName: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
   { name: "Profile Settings", shortName: "Profile", href: "/dashboard/profile", icon: Settings },
 ];
 
