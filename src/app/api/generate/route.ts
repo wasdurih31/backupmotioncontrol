@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { del, getSignedUrl } from '@vercel/blob';
+import { del } from '@vercel/blob';
 import { db } from '@/db';
 import { users, tasks } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -45,11 +45,9 @@ export async function POST(req: Request) {
 
     const user = userResult[0];
 
-// getSignedUrl imported at top
+// Since blobs are uploaded with public access, we can use the URLs directly.
+// No signed URL generation is needed.
 
-// ... inside POST after extracting videoUrl, imageUrl
-    const signedVideoUrl = await getSignedUrl(videoUrl, { expiresIn: 300 });
-    const signedImageUrl = await getSignedUrl(imageUrl, { expiresIn: 300 });
 
     // Call Freepik API using signed URLs
     const freepikRes = await fetch('https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std', {
@@ -60,8 +58,8 @@ export async function POST(req: Request) {
         'x-freepik-api-key': user.apiKey as string,
       },
       body: JSON.stringify({
-        video: { url: signedVideoUrl },
-        image: { url: signedImageUrl },
+        video: { url: videoUrl },
+        image: { url: imageUrl },
         prompt: prompt || "",
         character_orientation: character_orientation || "video",
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
@@ -70,19 +68,20 @@ export async function POST(req: Request) {
 
     const freepikData = await freepikRes.json();
 
-    // Freepik may return 200 with success:false – treat as error
+    // HTTP error (non‑2xx)
+    if (!freepikRes.ok) {
+      console.error('Freepik API Error:', freepikData);
+      await cleanupBlobs([videoUrl, imageUrl]);
+      return NextResponse.json({ error: freepikData.message || 'Failed to generate video' }, { status: freepikRes.status });
+    }
+
+    // API‑level failure (success flag false)
     if (!freepikData.success) {
       console.error('Freepik API reported failure:', freepikData);
       await cleanupBlobs([videoUrl, imageUrl]);
       return NextResponse.json({ error: freepikData.message || 'Freepik generation failed' }, { status: freepikData.status || 500 });
     }
-      console.error('Freepik API Error:', freepikData);
 
-      // Cleanup uploaded blobs on failure — user will re-upload
-      await cleanupBlobs([videoUrl, imageUrl]);
-
-      return NextResponse.json({ error: freepikData.message || 'Failed to generate video' }, { status: freepikRes.status });
-    }
 
     const taskId = freepikData?.data?.task_id;
     if (!taskId) {
