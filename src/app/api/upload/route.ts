@@ -62,7 +62,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     try {
       const filename = request.headers.get('x-vercel-blob-filename') || `upload-${Date.now()}`;
       const blob = await put(filename, request.body!, {
-        access: 'private',
+        access: 'public',
+        addRandomSuffix: true,
       });
 
       return NextResponse.json(blob);
