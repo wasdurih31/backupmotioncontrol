@@ -58,8 +58,8 @@ export async function POST(req: Request) {
         'x-freepik-api-key': user.apiKey as string,
       },
       body: JSON.stringify({
-        reference_video_url: videoUrl,
-        character_image_url: imageUrl,
+        video_url: videoUrl,
+        image_url: imageUrl,
         prompt: prompt || "",
         character_orientation: character_orientation || "video",
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
@@ -70,9 +70,9 @@ export async function POST(req: Request) {
 
     // HTTP error (non‑2xx)
     if (!freepikRes.ok) {
-      console.error('Freepik API Error:', freepikData);
+      console.error('Freepik API Error Full:', JSON.stringify(freepikData, null, 2));
       await cleanupBlobs([videoUrl, imageUrl]);
-      return NextResponse.json({ error: freepikData.message || 'Failed to generate video' }, { status: freepikRes.status });
+      return NextResponse.json({ error: `${freepikData.message || 'Failed to generate video'}: ${JSON.stringify(freepikData)}` }, { status: freepikRes.status });
     }
 
     // API‑level failure (success flag false)
