@@ -106,7 +106,8 @@ export async function POST(req: Request) {
       .where(eq(users.id, user.id));
 
     return NextResponse.json({ success: true, taskId });
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Generate Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
