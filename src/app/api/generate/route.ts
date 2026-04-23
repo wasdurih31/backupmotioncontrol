@@ -58,8 +58,8 @@ export async function POST(req: Request) {
         'x-freepik-api-key': user.apiKey as string,
       },
       body: JSON.stringify({
-        video: { url: videoUrl },
-        image: { url: imageUrl },
+        reference_video_url: videoUrl,
+        character_image_url: imageUrl,
         prompt: prompt || "",
         character_orientation: character_orientation || "video",
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
