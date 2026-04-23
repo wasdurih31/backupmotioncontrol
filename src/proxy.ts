@@ -10,23 +10,32 @@ export async function proxy(request: NextRequest) {
   // Define protected paths
   const isDashboardPath = pathname.startsWith('/dashboard');
   const isAdminPath = pathname.startsWith('/admin');
+  const isAdminApiPath = pathname.startsWith('/api/admin');
   const isAuthPage = pathname === '/login' || pathname === '/ammarbilal/login';
 
   // If not a protected path or auth page, skip
-  if (!isDashboardPath && !isAdminPath && !isAuthPage) {
+  if (!isDashboardPath && !isAdminPath && !isAdminApiPath && !isAuthPage) {
     return NextResponse.next();
   }
 
   const session = request.cookies.get('session')?.value;
-  let decodedToken = null;
+  let decodedToken: any = null;
 
   if (session) {
     try {
       const { payload } = await jwtVerify(session, JWT_SECRET);
-      decodedToken = payload as any;
+      decodedToken = payload;
     } catch (error) {
       console.log('Invalid token in middleware');
     }
+  }
+
+  // API Protection
+  if (isAdminApiPath) {
+    if (!decodedToken || decodedToken.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.next();
   }
 
   // Redirect authenticated users away from login pages
@@ -43,9 +52,8 @@ export async function proxy(request: NextRequest) {
     if (!decodedToken) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // Strictly block admin from dashboard or vice versa? 
-    // Usually admin has access to admin panel. Let's say user only for dashboard
-    if (decodedToken.role !== 'user') {
+    // Admins are allowed to visit the dashboard area as well
+    if (decodedToken.role !== 'user' && decodedToken.role !== 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
   }
@@ -62,13 +70,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/dashboard/:path*',
+    '/admin/:path*',
+    '/api/admin/:path*',
+    '/login',
+    '/ammarbilal/login',
   ],
 };

@@ -176,24 +176,34 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6 mt-4">
-              {tasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="flex items-center">
-                  <div className={`w-2 h-2 rounded-full mr-4 ${
-                    task.status === 'success' ? 'bg-green-500' :
-                    task.status === 'processing' ? 'bg-blue-500 animate-pulse' :
-                    task.status === 'queued' ? 'bg-amber-500' : 'bg-red-500'
-                  }`} />
-                  <div className="space-y-1 flex-1 overflow-hidden">
-                    <p className="text-sm font-medium leading-none truncate">
-                      {task.prompt || "No prompt provided"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {task.id.slice(0, 8)}...
-                    </p>
+              {tasks.slice(0, 5).map((task) => (
+                <div key={task.id} className="group relative flex flex-col space-y-2 pb-4 border-b border-border/30 last:border-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        task.status === 'success' ? 'bg-green-500' :
+                        task.status === 'processing' ? 'bg-blue-500 animate-pulse' :
+                        task.status === 'queued' ? 'bg-amber-500' : 'bg-red-500'
+                      }`} />
+                      <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                        task.engine === 'pixverse' 
+                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                      }`}>
+                        {task.engine || 'KLING'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        #{task.id.slice(0, 6)}
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                      {new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                  <div className="text-xs font-medium text-muted-foreground ml-auto whitespace-nowrap">
-                    {new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+                  
+                  <p className="text-[11px] text-foreground/80 line-clamp-2 leading-relaxed italic">
+                    "{task.prompt || "No prompt provided"}"
+                  </p>
                 </div>
               ))}
               {tasks.length === 0 && (

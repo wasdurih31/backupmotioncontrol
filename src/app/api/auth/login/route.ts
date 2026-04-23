@@ -40,6 +40,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Akun Anda tidak aktif. Silakan hubungi admin.' }, { status: 403 });
     }
 
+    // Check Subscription Expiration
+    const now = new Date();
+    if (user.subscriptionStart && now < new Date(user.subscriptionStart)) {
+      return NextResponse.json({ error: 'Masa berlangganan Anda belum dimulai.' }, { status: 403 });
+    }
+    if (user.subscriptionEnd && now > new Date(user.subscriptionEnd)) {
+      return NextResponse.json({ error: 'Masa aktif akun Anda telah habis. Silakan perpanjang.' }, { status: 403 });
+    }
+
     // Update lastLoginAt
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 

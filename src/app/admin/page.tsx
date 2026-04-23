@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, 
@@ -9,14 +10,13 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   AreaChart,
   Area
 } from "recharts";
-import { Users, Video, Activity, TrendingUp } from "lucide-react";
+import { Users, Video, Activity, TrendingUp, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-// Dummy data for global activity
+// Placeholder trend data (since historical tracking isn't implemented yet)
 const generateData = [
   { name: "Mon", total: 120 },
   { name: "Tue", total: 240 },
@@ -28,13 +28,48 @@ const generateData = [
 ];
 
 const usersData = [
-  { name: "Week 1", users: 400 },
-  { name: "Week 2", users: 550 },
-  { name: "Week 3", users: 700 },
-  { name: "Week 4", users: 850 },
+  { name: "Week 1", users: 40 },
+  { name: "Week 2", users: 55 },
+  { name: "Week 3", users: 70 },
+  { name: "Week 4", users: 85 },
 ];
 
+interface Stats {
+  totalUsers: number;
+  totalGenerations: number;
+  activeToday: number;
+  successRate: string;
+}
+
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/admin/stats");
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch stats");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 w-full items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -49,8 +84,8 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">1,248</div>
-            <p className="text-xs text-muted-foreground mt-1">+12 this week</p>
+            <div className="text-3xl font-bold">{stats?.totalUsers || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Registered accounts</p>
           </CardContent>
         </Card>
         
@@ -60,8 +95,8 @@ export default function AdminDashboard() {
             <Video className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">34,500</div>
-            <p className="text-xs text-muted-foreground mt-1">+1,240 today</p>
+            <div className="text-3xl font-bold">{stats?.totalGenerations?.toLocaleString() || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Videos generated</p>
           </CardContent>
         </Card>
 
@@ -71,8 +106,8 @@ export default function AdminDashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">432</div>
-            <p className="text-xs text-muted-foreground mt-1">Users currently online</p>
+            <div className="text-3xl font-bold text-foreground">{stats?.activeToday || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Users active in last 24h</p>
           </CardContent>
         </Card>
 
@@ -82,8 +117,8 @@ export default function AdminDashboard() {
             <TrendingUp className="h-4 w-4 text-green-500/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">96.4%</div>
-            <p className="text-xs text-muted-foreground mt-1">Across all requests</p>
+            <div className="text-3xl font-bold text-foreground">{stats?.successRate || "100%"}</div>
+            <p className="text-xs text-muted-foreground mt-1">Pipeline health</p>
           </CardContent>
         </Card>
       </div>

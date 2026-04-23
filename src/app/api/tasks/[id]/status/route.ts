@@ -104,8 +104,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     const apiKey = userResult[0].apiKey;
 
+    // Determine polling endpoint based on task engine
+    const pollingEndpoint = task.engine === 'pixverse'
+      ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${taskId}`
+      : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${taskId}`;
+
     // Poll Freepik API
-    const freepikRes = await fetch(`https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${taskId}`, {
+    const freepikRes = await fetch(pollingEndpoint, {
       headers: {
         'Accept': 'application/json',
         'x-freepik-api-key': apiKey as string,

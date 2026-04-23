@@ -26,10 +26,13 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { videoUrl, imageUrl, prompt, character_orientation, cfg_scale } = await req.json();
+    const { 
+      videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine,
+      resolution, duration, negative_prompt, style
+    } = await req.json();
 
-    if (!videoUrl || !imageUrl) {
-      return NextResponse.json({ error: 'Video and Image URLs are required' }, { status: 400 });
+    if (!imageUrl || (engine === 'kling' && !videoUrl)) {
+      return NextResponse.json({ error: 'Image (and Video for Kling) URLs are required' }, { status: 400 });
     }
 
     // Get user's API Key
@@ -45,25 +48,44 @@ export async function POST(req: Request) {
 
     const user = userResult[0];
 
-// Since blobs are uploaded with public access, we can use the URLs directly.
-// No signed URL generation is needed.
+    // Determine Freepik endpoint and payload
+    let endpoint = '';
+    let payload: any = {};
 
+    if (engine === 'pixverse') {
+      endpoint = 'https://api.freepik.com/v1/ai/image-to-video/pixverse-v5';
+      payload = {
+        image_url: imageUrl,
+        prompt: prompt,
+        resolution: resolution || "720p",
+        duration: duration || 5,
+        negative_prompt: negative_prompt || "",
+        art_style: style || undefined,
+      };
+    } else {
+      // Kling (default)
+      endpoint = model === 'pro' 
+        ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
+        : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
+      
+      payload = {
+        video_url: videoUrl,
+        image_url: imageUrl,
+        prompt: prompt || "",
+        character_orientation: character_orientation || "video",
+        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+      };
+    }
 
-    // Call Freepik API using signed URLs
-    const freepikRes = await fetch('https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std', {
+    // Call Freepik API
+    const freepikRes = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'x-freepik-api-key': user.apiKey as string,
       },
-      body: JSON.stringify({
-        video_url: videoUrl,
-        image_url: imageUrl,
-        prompt: prompt || "",
-        character_orientation: character_orientation || "video",
-        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const freepikData = await freepikRes.json();
@@ -87,9 +109,11 @@ export async function POST(req: Request) {
       id: taskId,
       userId: user.id,
       prompt: prompt || null,
-      videoUrl: videoUrl,   // source blob — will be deleted after success
-      imageUrl: imageUrl,   // source blob — will be deleted after success
-      characterOrientation: character_orientation || 'video',
+      videoUrl: videoUrl || null,   
+      imageUrl: imageUrl,   
+      characterOrientation: character_orientation || null,
+      engine: engine || 'kling',
+      model: model || 'motion_control_std',
       status: 'processing',
     });
 

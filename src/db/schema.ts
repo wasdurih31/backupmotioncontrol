@@ -11,6 +11,8 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   lastLoginAt: timestamp('last_login_at'),
   isActive: boolean('is_active').default(true),
+  subscriptionStart: timestamp('subscription_start'),
+  subscriptionEnd: timestamp('subscription_end'),
 });
 
 export const tasks = pgTable('tasks', {
@@ -24,6 +26,8 @@ export const tasks = pgTable('tasks', {
   videoUrl: text('video_url'), // Original motion video from Blob
   imageUrl: text('image_url'), // Character image from Blob
   resultUrl: text('result_url'), // Result video
+  engine: varchar('engine', { length: 50 }).default('kling'),
+  model: varchar('model', { length: 50 }).default('motion_control_std'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at'),
 });

@@ -1,24 +1,8 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
+import { getSession } from '@/lib/auth';
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'universeai-super-secret-key-2026');
-
-async function getSession() {
-  const cookieStore = await cookies();
-  const session = cookieStore.get('session')?.value;
-  if (!session) return null;
-
-  try {
-    const { payload } = await jwtVerify(session, JWT_SECRET);
-    return payload as { id: string; role: string; accessCode: string };
-  } catch (error) {
-    return null;
-  }
-}
 
 export async function GET() {
   try {

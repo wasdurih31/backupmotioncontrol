@@ -21,8 +21,14 @@ export interface LogEntry {
 
 interface GenerateFormValues {
   prompt?: string;
-  character_orientation: "video" | "image";
-  cfg_scale: number;
+  character_orientation?: "video" | "image";
+  cfg_scale?: number;
+  model: string;
+  engine: "kling" | "pixverse";
+  resolution?: string;
+  duration?: number;
+  negative_prompt?: string;
+  style?: string;
 }
 
 export type PollingStatus = "idle" | "polling" | "completed" | "failed";
@@ -165,7 +171,13 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
   runGeneration: async (values) => {
     const { videoFile, imageFile, activeTaskId } = get();
-    if (!videoFile || !imageFile) return;
+    
+    // ── Validation based on Engine ──
+    if (values.engine === "kling") {
+      if (!videoFile || !imageFile) return;
+    } else {
+      if (!imageFile) return;
+    }
 
     // ── Block if there's already an active task (single queue) ──
     if (activeTaskId) return;
@@ -199,11 +211,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     try {
       // ── Step 1: Validate ──
       updateStep("validate", "running");
+      addLog("info", `Engine: ${values.engine.toUpperCase()}`);
       addLog("info", "Validating input files...");
-      addLog("info", `Video: ${videoFile.name} (${(videoFile.size / 1048576).toFixed(1)} MB)`);
-      addLog("info", `Image: ${imageFile.name} (${(imageFile.size / 1048576).toFixed(1)} MB)`);
+      if (videoFile) addLog("info", `Video: ${videoFile.name} (${(videoFile.size / 1048576).toFixed(1)} MB)`);
+      addLog("info", `Image: ${imageFile.name} (${(imageFile.size / 1048576).toFixed(1)} MB)`); 
 
-      if (videoFile.size > 500 * 1048576) {
+      if (videoFile && videoFile.size > 500 * 1048576) {
         updateStep("validate", "error", "Video exceeds 500 MB");
         addLog("error", "✗ Video file exceeds 500 MB limit");
         throw new Error("Video file is too large (max 500 MB)");
@@ -213,31 +226,35 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       updateStep("validate", "success", "All checks passed");
       addLog("success", "✓ Input validation passed");
 
-      // ── Step 2: Upload Video ──
-      updateStep("upload_video", "running", "Uploading...");
-      addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
+      // ── Step 2: Upload Video (Skip for PixVerse) ──
+      let videoBlobUrl: string | undefined;
+      if (values.engine === "kling" && videoFile) {
+        updateStep("upload_video", "running", "Uploading...");
+        addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
 
-      let videoBlobUrl: string;
-      try {
-        const vRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "x-vercel-blob-filename": videoFile.name },
-          body: videoFile,
-        });
-        if (!vRes.ok) {
-          const errData = await vRes.json().catch(() => ({ error: `HTTP ${vRes.status}` }));
-          throw new Error(errData.error || `Upload failed (${vRes.status})`);
+        try {
+          const vRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "x-vercel-blob-filename": videoFile.name },
+            body: videoFile,
+          });
+          if (!vRes.ok) {
+            const errData = await vRes.json().catch(() => ({ error: `HTTP ${vRes.status}` }));
+            throw new Error(errData.error || `Upload failed (${vRes.status})`);
+          }
+          const vData = await vRes.json();
+          videoBlobUrl = vData.url;
+        } catch (uploadErr: any) {
+          updateStep("upload_video", "error", uploadErr.message?.slice(0, 60));
+          addLog("error", `✗ Video upload failed: ${uploadErr.message}`);
+          throw uploadErr;
         }
-        const vData = await vRes.json();
-        videoBlobUrl = vData.url;
-      } catch (uploadErr: any) {
-        updateStep("upload_video", "error", uploadErr.message?.slice(0, 60));
-        addLog("error", `✗ Video upload failed: ${uploadErr.message}`);
-        throw uploadErr;
+        updateStep("upload_video", "success", "Done");
+        addLog("success", `✓ Video uploaded → ${videoBlobUrl.slice(0, 50)}...`);
+      } else {
+        updateStep("upload_video", "success", "Skipped");
+        addLog("info", "– Video upload skipped (Image-to-Video mode)");
       }
-
-      updateStep("upload_video", "success", "Done");
-      addLog("success", `✓ Video uploaded → ${videoBlobUrl.slice(0, 50)}...`);
 
       // ── Step 3: Upload Image ──
       updateStep("upload_image", "running", "Uploading...");
@@ -286,6 +303,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           prompt: values.prompt,
           character_orientation: values.character_orientation,
           cfg_scale: values.cfg_scale,
+          model: values.model,
+          engine: values.engine,
+          resolution: values.resolution,
+          duration: values.duration,
+          negative_prompt: values.negative_prompt,
+          style: values.style,
         }),
       });
 
