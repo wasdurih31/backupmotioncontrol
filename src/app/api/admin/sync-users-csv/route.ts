@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       columns: true, 
       skip_empty_lines: true,
       relax_column_count: true
-    });
+    }) as any[];
 
     let updatedCount = 0;
     let insertedCount = 0;
