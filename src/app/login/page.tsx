@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useMockStore } from "@/store/useMockStore";
 
 const loginSchema = z.object({
   identifier: z.string().min(3, "Email/No HP is required"),
@@ -30,7 +29,6 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const login = useMockStore((state) => state.login);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -44,16 +42,22 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      const success = await login(values.identifier, values.accessCode);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
       
-      if (success) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         toast.success("Login successful!");
         router.push("/dashboard");
       } else {
-        toast.error("Invalid access code. Format should be KEY-XXXX.");
+        toast.error(data.error || "Login failed. Please check your credentials.");
       }
     } catch (error) {
-      toast.error("An error occurred during login.");
+      toast.error("An error occurred during login. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -118,10 +122,6 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
-
-          <div className="mt-8 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-            <p>User demo: <span className="text-foreground">user@example.com</span> / <span className="text-foreground">KEY-1234</span></p>
-          </div>
         </div>
       </motion.div>
     </div>

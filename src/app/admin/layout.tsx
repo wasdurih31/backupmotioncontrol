@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMockStore } from "@/store/useMockStore";
 import { 
   LayoutDashboard, 
   Users, 
   UserPlus, 
   LogOut,
-  ShieldAlert
+  ShieldAlert,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -26,16 +26,50 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const user = useMockStore((state) => state.user);
-  const logout = useMockStore((state) => state.logout);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push("/ammarbilal/login");
+    async function checkAdmin() {
+      try {
+        const res = await fetch('/api/user/profile');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.role === 'admin') {
+            setIsAdmin(true);
+          } else {
+            router.push("/ammarbilal/login");
+          }
+        } else {
+          router.push("/ammarbilal/login");
+        }
+      } catch {
+        router.push("/ammarbilal/login");
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }, [user, router]);
+    checkAdmin();
+  }, [router]);
 
-  if (!user || user.role !== 'admin') return null;
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push("/");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -70,10 +104,7 @@ export default function AdminLayout({
 
         <div className="p-4 border-t border-border/50">
           <button
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
+            onClick={handleLogout}
             className="flex items-center w-full px-4 py-3 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all"
           >
             <LogOut className="h-5 w-5 mr-3" />
@@ -89,7 +120,7 @@ export default function AdminLayout({
           <div className="flex items-center gap-4">
             <div className="text-sm">
               <span className="text-muted-foreground">Admin: </span>
-              <span className="font-medium text-foreground">{user.email}</span>
+              <span className="font-medium text-foreground">ammarbilal</span>
             </div>
           </div>
         </header>

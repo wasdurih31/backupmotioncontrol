@@ -1,6 +1,6 @@
 "use client";
 
-import { useMockStore } from "@/store/useMockStore";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, 
@@ -13,9 +13,9 @@ import {
   LineChart,
   Line
 } from "recharts";
-import { Video, CheckCircle2, Clock, XCircle, Activity } from "lucide-react";
+import { Video, CheckCircle2, Clock, XCircle, Activity, Loader2 } from "lucide-react";
 
-// Dummy data for 7 days activity
+// Dummy data for 7 days activity - can be replaced with real analytics later
 const activityData = [
   { name: "Mon", total: 4 },
   { name: "Tue", total: 7 },
@@ -27,29 +27,65 @@ const activityData = [
 ];
 
 export default function DashboardHome() {
-  const tasks = useMockStore((state) => state.tasks);
-  const generateCount = useMockStore((state) => state.generateCount);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [tasksRes, profileRes] = await Promise.all([
+          fetch('/api/tasks'),
+          fetch('/api/user/profile')
+        ]);
+        
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json();
+          setTasks(tasksData.data || []);
+        }
+        
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const generateCount = profile?.totalGenerate || 0;
   const successTasks = tasks.filter(t => t.status === 'success').length;
   const pendingTasks = tasks.filter(t => t.status === 'queued' || t.status === 'processing').length;
   const failedTasks = tasks.filter(t => t.status === 'failed').length;
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen -mt-20">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8 pb-20 md:pb-0">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Overview</h1>
-        <p className="text-muted-foreground">Monitor your video generation activity and limits.</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">Overview</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Monitor your video generation activity.</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-4">
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Generated</CardTitle>
             <Video className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{generateCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">+2 from yesterday</p>
+            <div className="text-2xl md:text-3xl font-bold">{generateCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total history</p>
           </CardContent>
         </Card>
         
@@ -59,8 +95,8 @@ export default function DashboardHome() {
             <CheckCircle2 className="h-4 w-4 text-green-500/70" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{successTasks}</div>
-            <p className="text-xs text-muted-foreground mt-1">98% success rate</p>
+            <div className="text-2xl md:text-3xl font-bold text-foreground">{successTasks}</div>
+            <p className="text-xs text-muted-foreground mt-1">Completed generations</p>
           </CardContent>
         </Card>
 
@@ -87,7 +123,7 @@ export default function DashboardHome() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-7">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-7">
         <Card className="col-span-4 bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -152,7 +188,7 @@ export default function DashboardHome() {
                       {task.prompt || "No prompt provided"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {task.id}
+                      {task.id.slice(0, 8)}...
                     </p>
                   </div>
                   <div className="text-xs font-medium text-muted-foreground ml-auto whitespace-nowrap">

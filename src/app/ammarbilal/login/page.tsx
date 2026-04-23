@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useMockStore } from "@/store/useMockStore";
 
 const adminLoginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -30,7 +29,6 @@ const adminLoginSchema = z.object({
 export default function AdminLoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const adminLogin = useMockStore((state) => state.adminLogin);
 
   const form = useForm<z.infer<typeof adminLoginSchema>>({
     resolver: zodResolver(adminLoginSchema),
@@ -44,13 +42,19 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     
     try {
-      const success = await adminLogin(values.username, values.password);
-      
-      if (success) {
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
         toast.success("Admin login successful!");
         router.push("/admin");
       } else {
-        toast.error("Invalid username or password.");
+        toast.error(data.error || "Invalid username or password.");
       }
     } catch (error) {
       toast.error("An error occurred during login.");
