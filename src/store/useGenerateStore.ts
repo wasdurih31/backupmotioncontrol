@@ -23,7 +23,7 @@ interface GenerateFormValues {
   prompt?: string;
   character_orientation?: "video" | "image";
   cfg_scale?: number;
-  model: string;
+  model?: string;
   engine: "kling" | "pixverse";
   resolution?: string;
   duration?: number;
@@ -250,7 +250,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           throw uploadErr;
         }
         updateStep("upload_video", "success", "Done");
-        addLog("success", `✓ Video uploaded → ${videoBlobUrl.slice(0, 50)}...`);
+        addLog("success", `✓ Video uploaded → ${videoBlobUrl?.slice(0, 50)}...`);
       } else {
         updateStep("upload_video", "success", "Skipped");
         addLog("info", "– Video upload skipped (Image-to-Video mode)");

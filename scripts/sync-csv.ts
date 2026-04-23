@@ -31,7 +31,7 @@ async function run() {
     columns: true, 
     skip_empty_lines: true,
     relax_column_count: true
-  });
+  }) as any[];
 
   console.log(`Processing ${records.length} records...`);
 

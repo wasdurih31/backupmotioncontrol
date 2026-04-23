@@ -180,7 +180,7 @@ const generateSchema = z.object({
   prompt: z.string().max(2500, "Prompt cannot exceed 2500 characters").optional(),
   character_orientation: z.enum(["video", "image"]).optional(),
   cfg_scale: z.number().min(0).max(1).optional(),
-  model: z.string().optional().default("std"),
+  model: z.string().optional(),
   engine: z.enum(["kling", "pixverse"]),
   resolution: z.enum(["360p", "540p", "720p", "1080p"]).optional(),
   duration: z.number().optional(),
@@ -521,7 +521,7 @@ export default function GenerateVideoPage() {
                                 <Clock className="w-3 h-3 text-amber-400/70" />
                                 Duration
                               </FormLabel>
-                              <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val || "5"))} value={field.value?.toString()}>
                                 <FormControl>
                                   <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs hover:border-amber-500/30 transition-all focus:ring-1 focus:ring-amber-500/50">
                                     <SelectValue placeholder="Select" />
