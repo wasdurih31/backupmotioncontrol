@@ -75,16 +75,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `${freepikData.message || 'Failed to generate video'}: ${JSON.stringify(freepikData)}` }, { status: freepikRes.status });
     }
 
-    // API‑level failure (success flag false)
-    if (!freepikData.success) {
-      console.error('Freepik API reported failure:', freepikData);
-      await cleanupBlobs([videoUrl, imageUrl]);
-      return NextResponse.json({ error: freepikData.message || 'Freepik generation failed' }, { status: freepikData.status || 500 });
-    }
-
-
-    const taskId = freepikData?.data?.task_id;
+    const taskId = freepikData?.data?.task_id || freepikData?.task_id;
     if (!taskId) {
+      console.error('Freepik API unrecognized success response:', freepikData);
       await cleanupBlobs([videoUrl, imageUrl]);
       return NextResponse.json({ error: 'Invalid response from Freepik API' }, { status: 500 });
     }
