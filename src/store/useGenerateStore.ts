@@ -44,6 +44,7 @@ interface GenerateState {
   activeTaskId: string | null;
   resultVideoUrl: string | null;
   pollingStatus: PollingStatus;
+  hasRestoredTask: boolean; // true if we loaded a task from DB on page load
 
   // Actions
   setVideoFile: (f: File | null) => void;
@@ -51,6 +52,7 @@ interface GenerateState {
   setMonitorOpen: (open: boolean) => void;
   resetPipeline: () => void;
   clearResult: () => void;
+  loadLatestTask: () => Promise<void>;
   runGeneration: (values: GenerateFormValues) => Promise<void>;
 }
 
@@ -83,12 +85,13 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   logs: [],
   isSubmitting: false,
   showMonitor: false,
-  monitorOpen: false, // minimized by default
+  monitorOpen: false,
   isComplete: false,
 
   activeTaskId: null,
   resultVideoUrl: null,
   pollingStatus: "idle",
+  hasRestoredTask: false,
 
   setVideoFile: (f) => set({ videoFile: f }),
   setImageFile: (f) => set({ imageFile: f }),
@@ -109,6 +112,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       activeTaskId: null,
       resultVideoUrl: null,
       pollingStatus: "idle",
+      hasRestoredTask: false,
       steps: INITIAL_STEPS.map((s) => ({ ...s })),
       logs: [],
       isSubmitting: false,
@@ -119,6 +123,46 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       imageFile: null,
     }),
 
+  // ── Load latest task from DB on page load ──
+  loadLatestTask: async () => {
+    // Don't reload if we already have an active task in memory
+    const state = get();
+    if (state.activeTaskId || state.isSubmitting) return;
+
+    try {
+      const res = await fetch("/api/tasks");
+      if (!res.ok) return;
+      const json = await res.json();
+      const tasks = json.data;
+      if (!tasks || tasks.length === 0) return;
+
+      const latest = tasks[0]; // already sorted by createdAt DESC
+
+      if (latest.status === "processing" || latest.status === "queued") {
+        // Task still in progress — resume polling
+        set({
+          activeTaskId: latest.id,
+          pollingStatus: "polling",
+          hasRestoredTask: true,
+        });
+        startPolling(latest.id, set, get);
+      } else if (latest.status === "success" && latest.resultUrl) {
+        // Task completed recently — show result
+        const expiresAt = latest.expiresAt ? new Date(latest.expiresAt).getTime() : 0;
+        if (expiresAt > Date.now()) {
+          set({
+            activeTaskId: latest.id,
+            resultVideoUrl: latest.resultUrl,
+            pollingStatus: "completed",
+            hasRestoredTask: true,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load latest task:", e);
+    }
+  },
+
   runGeneration: async (values) => {
     const { videoFile, imageFile, activeTaskId } = get();
     if (!videoFile || !imageFile) return;
@@ -126,7 +170,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     // ── Block if there's already an active task (single queue) ──
     if (activeTaskId) return;
 
-    // Internal helpers that write to the store directly
     const addLog = (level: LogEntry["level"], message: string) => {
       set((s) => ({ logs: [...s.logs, { time: now(), level, message }] }));
     };
@@ -145,11 +188,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       logs: [],
       isSubmitting: true,
       showMonitor: true,
-      monitorOpen: false, // keep minimized
+      monitorOpen: false,
       isComplete: false,
       resultVideoUrl: null,
       pollingStatus: "idle",
       activeTaskId: null,
+      hasRestoredTask: false,
     });
 
     try {
@@ -224,7 +268,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       // ── Step 4: Verify API Key ──
       updateStep("verify_key", "running", "Checking...");
       addLog("info", "Verifying API key with server...");
-
       await new Promise((r) => setTimeout(r, 200));
       updateStep("verify_key", "success", "Valid");
       addLog("success", "✓ API key verified");
@@ -268,7 +311,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       // ── Step 6: Save Task ──
       updateStep("save_task", "running", "Writing to DB...");
       addLog("info", "Recording task in database...");
-
       await new Promise((r) => setTimeout(r, 300));
       updateStep("save_task", "success", "Saved");
       addLog("success", "════════════════════════════════════");
@@ -278,14 +320,13 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       set({ isComplete: true, activeTaskId: taskId, pollingStatus: "polling" });
 
       // ── Start polling for result ──
-      startPolling(taskId, set, get, addLog);
+      startPolling(taskId, set, get);
 
     } catch (error: any) {
       console.error(error);
       addLog("error", `Pipeline failed: ${error.message}`);
       addLog("warn", "Source files will be cleaned up by server.");
       addLog("info", "Please re-upload your video and image to try again.");
-      // Clear local file references — server already cleans up blobs
       set({ videoFile: null, imageFile: null });
     } finally {
       set({ isSubmitting: false });
@@ -293,25 +334,23 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   },
 }));
 
-// ─── Polling Function (runs outside the store action) ────────────────
+// ─── Polling Function ────────────────────────────────────────────────
 function startPolling(
   taskId: string,
   set: (partial: Partial<GenerateState> | ((s: GenerateState) => Partial<GenerateState>)) => void,
   get: () => GenerateState,
-  addLog: (level: LogEntry["level"], message: string) => void
 ) {
   let pollCount = 0;
 
   const poll = async () => {
     const state = get();
-    // Stop if cleared or a different task
+    // Stop if cleared or different task or already done
     if (state.activeTaskId !== taskId || state.pollingStatus !== "polling") return;
 
     pollCount++;
     try {
       const res = await fetch(`/api/tasks/${taskId}/status`);
       if (!res.ok) {
-        addLog("warn", `Polling attempt ${pollCount} failed (HTTP ${res.status})`);
         schedulePoll();
         return;
       }
@@ -319,24 +358,21 @@ function startPolling(
       const json = await res.json();
       const task = json.data;
 
-      if (task.status === "success" && task.resultUrl) {
-        addLog("success", "════════════════════════════════════");
-        addLog("success", "🎬 Video generation complete!");
-        set({ pollingStatus: "completed", resultVideoUrl: task.resultUrl });
+      if (task.status === "success") {
+        // Mark as completed even if resultUrl is null (edge case)
+        set({
+          pollingStatus: "completed",
+          resultVideoUrl: task.resultUrl || null,
+        });
         return; // stop polling
       } else if (task.status === "failed") {
-        addLog("error", "✗ Video generation failed on Freepik side.");
         set({ pollingStatus: "failed" });
         return; // stop polling
       } else {
         // Still processing
-        if (pollCount % 6 === 0) {
-          addLog("info", `Still processing... (${Math.round(pollCount * POLL_INTERVAL_MS / 1000)}s elapsed)`);
-        }
         schedulePoll();
       }
     } catch (e: any) {
-      addLog("warn", `Polling error: ${e.message}`);
       schedulePoll();
     }
   };
