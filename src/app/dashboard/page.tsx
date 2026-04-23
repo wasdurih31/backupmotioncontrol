@@ -152,7 +152,7 @@ export default function DashboardHome() {
                       {task.prompt || "No prompt provided"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {task.id} • {task.duration}
+                      {task.id}
                     </p>
                   </div>
                   <div className="text-xs font-medium text-muted-foreground ml-auto whitespace-nowrap">

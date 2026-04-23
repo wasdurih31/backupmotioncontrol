@@ -33,7 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const generateSchema = z.object({
   prompt: z.string().max(2500, "Prompt cannot exceed 2500 characters").optional(),
   character_orientation: z.enum(["video", "image"]),
-  cfg_scale: z.coerce.number().min(0).max(1),
+  cfg_scale: z.number().min(0).max(1),
 });
 
 export default function GenerateVideoPage() {
@@ -211,14 +211,15 @@ export default function GenerateVideoPage() {
                     <FormItem>
                       <FormLabel>CFG Scale</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.1" 
-                          min="0" 
-                          max="1" 
-                          className="bg-background/50" 
-                          {...field} 
-                        />
+                          <Input 
+                            type="number" 
+                            step="0.1" 
+                            min="0" 
+                            max="1" 
+                            className="bg-background/50" 
+                            {...field} 
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
                       </FormControl>
                       <FormDescription>
                         0 to 1. Controls how closely the model follows the prompt.
