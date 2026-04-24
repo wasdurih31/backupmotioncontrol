@@ -58,6 +58,8 @@ interface GenerateState {
   setMonitorOpen: (open: boolean) => void;
   resetPipeline: () => void;
   clearResult: () => void;
+  galleryRefreshTrigger: number;
+  triggerGalleryRefresh: () => void;
   loadLatestTask: () => Promise<void>;
   runGeneration: (values: GenerateFormValues) => Promise<void>;
 }
@@ -98,7 +100,9 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   resultVideoUrl: null,
   pollingStatus: "idle",
   hasRestoredTask: false,
+  galleryRefreshTrigger: 0,
 
+  triggerGalleryRefresh: () => set((s) => ({ galleryRefreshTrigger: s.galleryRefreshTrigger + 1 })),
   setVideoFile: (f) => set({ videoFile: f }),
   setImageFile: (f) => set({ imageFile: f }),
   setMonitorOpen: (open) => set({ monitorOpen: open }),
@@ -179,8 +183,9 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       if (!imageFile) return;
     }
 
-    // ── Block if there's already an active task (single queue) ──
-    if (activeTaskId) return;
+    // ── Block if a task is actively running ──
+    const { pollingStatus, isSubmitting } = get();
+    if (pollingStatus === "polling" || isSubmitting) return;
 
     const addLog = (level: LogEntry["level"], message: string) => {
       set((s) => ({ logs: [...s.logs, { time: now(), level, message }] }));
@@ -200,7 +205,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       logs: [],
       isSubmitting: true,
       showMonitor: true,
-      monitorOpen: false,
+      monitorOpen: true,
       isComplete: false,
       resultVideoUrl: null,
       pollingStatus: "idle",
@@ -387,6 +392,7 @@ function startPolling(
           pollingStatus: "completed",
           resultVideoUrl: task.resultUrl || null,
         });
+        get().triggerGalleryRefresh();
         return; // stop polling
       } else if (task.status === "failed") {
         set({ pollingStatus: "failed" });

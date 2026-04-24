@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -142,7 +142,7 @@ function ResultSection() {
             </div>
           </div>
           <div className="p-4 flex gap-3">
-            <a href={resultVideoUrl} download target="_blank" rel="noopener noreferrer" className="flex-1">
+            <a href={`/api/download?url=${encodeURIComponent(resultVideoUrl)}`} download className="flex-1">
               <Button type="button" size="lg" className="w-full bg-white text-black hover:bg-white/90 font-bold gap-2 text-sm shadow-lg shadow-white/5">
                 <Download className="w-4 h-4" /> Download Video
               </Button>
@@ -171,6 +171,73 @@ function ResultSection() {
           <Button type="button" size="lg" variant="outline" className="border-border/50 gap-2 px-8" onClick={clearResult}><RefreshCw className="w-4 h-4" /> Try Again</Button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Gallery Section ───────────────────────────────────────────────────
+function GallerySection() {
+  const [tasks, setTasks] = useState<any[]>([]);
+  const galleryRefreshTrigger = useGenerateStore((s) => s.galleryRefreshTrigger);
+  const activeTaskId = useGenerateStore((s) => s.activeTaskId); // To exclude the active one if we want, but it's fine to show all.
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch("/api/tasks");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (mounted && json.data) {
+          const now = Date.now();
+          const validTasks = json.data.filter((t: any) => {
+            if (t.status !== "success" || !t.resultUrl) return false;
+            // Filter out the currently active task so it doesn't duplicate with ResultSection
+            if (t.id === activeTaskId) return false;
+            if (t.expiresAt && new Date(t.expiresAt).getTime() < now) return false;
+            return true;
+          });
+          setTasks(validTasks);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchTasks();
+    return () => { mounted = false; };
+  }, [galleryRefreshTrigger, activeTaskId]);
+
+  if (tasks.length === 0) return null;
+
+  return (
+    <div className="space-y-4 pt-6 border-t border-border/30">
+      <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-amber-500" />
+        Video Gallery (Recent)
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {tasks.map((t) => (
+          <div key={t.id} className="rounded-xl border border-border/50 bg-card/30 overflow-hidden relative group flex flex-col">
+            <div className="relative bg-black/50 flex-1">
+              <video src={t.resultUrl} className="w-full h-full aspect-video object-contain" controls playsInline />
+            </div>
+            <div className="p-3 border-t border-border/30 flex justify-between items-center bg-black/40">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-muted-foreground font-mono">ID: {t.id.slice(0, 8)}</span>
+                <span className="text-[10px] text-muted-foreground">{new Date(t.createdAt).toLocaleTimeString()}</span>
+              </div>
+              <a href={`/api/download?url=${encodeURIComponent(t.resultUrl)}`} download>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
+                  <Download className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
+            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[9px] text-white/70 border border-white/10 pointer-events-none">
+              Auto-deletes in 30m
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -300,8 +367,8 @@ export default function GenerateVideoPage() {
         </label>
         <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
         {file && previewUrl ? (
-          <div className="relative rounded-xl overflow-hidden border border-border bg-black group">
-            {isVideo ? <video src={previewUrl} className="w-full aspect-square object-cover" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="w-full aspect-square object-cover" />}
+          <div className="relative rounded-xl overflow-hidden border border-border bg-black/40 group flex items-center justify-center h-40">
+            {isVideo ? <video src={previewUrl} className="max-w-full max-h-full object-contain" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-lg" />}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                {!isGenerating && (
                 <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); }} className="p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white shadow-lg">
@@ -311,7 +378,7 @@ export default function GenerateVideoPage() {
             </div>
           </div>
         ) : (
-          <div className={`border border-dashed border-border/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 aspect-square ${isGenerating ? "opacity-50 pointer-events-none" : ""}`} onClick={() => inputRef.current?.click()}>
+          <div className={`border border-dashed border-border/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 h-40 ${isGenerating ? "opacity-50 pointer-events-none" : ""}`} onClick={() => inputRef.current?.click()}>
             <UploadCloud className="h-6 w-6 text-muted-foreground mb-2" />
             <p className="text-[10px] font-medium text-foreground">Upload {label}</p>
             <p className="text-[9px] text-muted-foreground mt-0.5">{formats}</p>
@@ -607,6 +674,7 @@ export default function GenerateVideoPage() {
           <div className="space-y-8">
             {showMonitor && <ProcessMonitor steps={steps} logs={logs} isOpen={monitorOpen} onToggle={() => setMonitorOpen(!monitorOpen)} isRunning={isSubmitting} />}
             <div ref={resultSectionRef}><ResultSection /></div>
+            <GallerySection />
           </div>
           
           {/* Mobile Spacer to ensure content isn't covered by bottom nav */}

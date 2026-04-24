@@ -77,6 +77,11 @@ export async function POST(req: Request) {
       };
     }
 
+    // Apply a global staggered delay (2 to 6 seconds) to prevent simultaneous API clashes and bot-like behavior
+    const randomDelay = Math.floor(Math.random() * 4000) + 2000;
+    console.log(`[Security] Staggering request by ${randomDelay}ms for user ${user.id} to avoid API clashes...`);
+    await new Promise((resolve) => setTimeout(resolve, randomDelay));
+
     // Call Freepik API
     const freepikRes = await fetch(endpoint, {
       method: 'POST',
