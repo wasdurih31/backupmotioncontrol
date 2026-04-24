@@ -31,3 +31,15 @@ export const tasks = pgTable('tasks', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at'),
 });
+
+export const tutorials = pgTable('tutorials', {
+  id: text('id').primaryKey(),
+  title: varchar('title', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).unique(),
+  content: text('content'),
+  mediaUrl: text('media_url'),
+  mediaType: varchar('media_type', { length: 20 }), // 'image' or 'video'
+  link: text('link'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});

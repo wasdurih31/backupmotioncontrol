@@ -12,7 +12,8 @@ import {
   Loader2,
   Activity,
   Menu,
-  X
+  X,
+  BookOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -21,6 +22,7 @@ const adminLinks = [
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Create User", href: "/admin/create-user", icon: UserPlus },
   { name: "Live Activity", href: "/admin/activity", icon: Activity },
+  { name: "Tutorials", href: "/admin/tutorials", icon: BookOpen },
 ];
 
 export default function AdminLayout({

@@ -19,6 +19,7 @@ import { useGenerateStore } from "@/store/useGenerateStore";
 const navLinks = [
   { name: "Home", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Generate Video", shortName: "Generate", href: "/dashboard/generate", icon: Sparkles },
+  { name: "Tutorials", shortName: "Tutorials", href: "/dashboard/tutorial", icon: Video },
   { name: "Profile Settings", shortName: "Profile", href: "/dashboard/profile", icon: Settings },
 ];
 
