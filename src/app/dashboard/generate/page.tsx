@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGenerateStore, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // ─── Process Monitor ─────────────────────────────────────────────────
 function ProcessMonitor({ steps, logs, isOpen, onToggle, isRunning }: {
@@ -106,18 +107,8 @@ function ResultSection() {
   return (
     <div className="space-y-4">
       {pollingStatus === "polling" && (
-        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-sm p-8">
-          <div className="flex flex-col items-center justify-center text-center gap-4">
-            <div className="relative w-16 h-16">
-              <div className="w-16 h-16 rounded-full border-2 border-blue-500/20" />
-              <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-transparent border-t-blue-400 animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center"><Play className="w-6 h-6 text-blue-400 ml-0.5" /></div>
-            </div>
-            <div>
-              <p className="text-base font-medium text-foreground">Generating your video...</p>
-              <p className="text-sm text-muted-foreground mt-1">Please wait for the process to complete.</p>
-            </div>
-          </div>
+        <div className="rounded-xl border border-blue-500/10 bg-black/40 backdrop-blur-sm overflow-hidden min-h-[300px] flex items-center justify-center">
+          <LoadingOverlay isVisible={pollingStatus === "polling"} />
         </div>
       )}
 
@@ -388,7 +379,7 @@ export default function GenerateVideoPage() {
     );
   };
 
-  return (
+  return ( <>
     <div className="max-w-[1400px] mx-auto min-h-full pb-12">
       <div className="flex flex-col md:flex-row gap-6 md:gap-10 h-full">
         
@@ -682,5 +673,6 @@ export default function GenerateVideoPage() {
         </main>
       </div>
     </div>
-  );
+
+  </> );
 }
