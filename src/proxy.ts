@@ -26,7 +26,7 @@ export async function proxy(request: NextRequest) {
       const { payload } = await jwtVerify(session, JWT_SECRET);
       decodedToken = payload;
     } catch (error) {
-      console.log('Invalid token in middleware');
+      console.log('Invalid token in proxy');
     }
   }
 
@@ -41,7 +41,7 @@ export async function proxy(request: NextRequest) {
   // Redirect authenticated users away from login pages
   if (isAuthPage && decodedToken) {
     if (decodedToken.role === 'admin' && pathname === '/ammarbilal/login') {
-      return NextResponse.redirect(new URL('/admin', request.url));
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     } else if (decodedToken.role === 'user' && pathname === '/login') {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
     }
     // Admins are allowed to visit the dashboard area as well
     if (decodedToken.role !== 'user' && decodedToken.role !== 'admin') {
-      return NextResponse.redirect(new URL('/admin', request.url));
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
   }
 

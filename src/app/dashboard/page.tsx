@@ -30,6 +30,7 @@ export default function DashboardHome() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -55,6 +56,7 @@ export default function DashboardHome() {
       }
     }
     fetchData();
+    setHasMounted(true);
   }, []);
 
   const generateCount = profile?.totalGenerate || 0;
@@ -133,39 +135,41 @@ export default function DashboardHome() {
           </CardHeader>
           <CardContent className="pl-0">
             <div className="h-[300px] w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activityData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="#888888" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    dy={10}
-                  />
-                  <YAxis 
-                    stroke="#888888" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickFormatter={(value) => `${value}`}
-                    dx={-10}
-                  />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(20,20,20,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="total" 
-                    stroke="#ffffff" 
-                    strokeWidth={2}
-                    dot={{ r: 4, fill: '#fff', strokeWidth: 0 }}
-                    activeDot={{ r: 6, fill: '#fff' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {hasMounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activityData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      dy={10}
+                    />
+                    <YAxis 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `${value}`}
+                      dx={-10}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(20,20,20,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="total" 
+                      stroke="#ffffff" 
+                      strokeWidth={2}
+                      dot={{ r: 4, fill: '#fff', strokeWidth: 0 }}
+                      activeDot={{ r: 6, fill: '#fff' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>

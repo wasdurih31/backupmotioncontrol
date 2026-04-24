@@ -63,17 +63,15 @@ export default function AdminActivityPage() {
     });
   };
 
-  if (loading && activities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Streaming live activity...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 pb-20">
+      {loading && activities.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Streaming live activity...</p>
+        </div>
+      ) : (
+        <>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2">Live Activity</h1>
@@ -170,6 +168,8 @@ export default function AdminActivityPage() {
           </TableBody>
         </Table>
       </div>
+        </>
+      )}
     </div>
   );
 }

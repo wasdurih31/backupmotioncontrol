@@ -137,12 +137,12 @@ export default function AdminTutorials() {
     }
   }
 
-  if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
-  }
-
   return (
     <div className="space-y-8">
+      {isLoading ? (
+        <div className="p-8 text-center text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+      ) : (
+        <>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Tutorial Management</h1>
         <p className="text-muted-foreground">Add and manage tutorial articles.</p>
@@ -285,6 +285,8 @@ export default function AdminTutorials() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </div>
   );
 }

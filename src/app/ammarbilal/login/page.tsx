@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
 
       if (res.ok && data.success) {
         toast.success("Admin login successful!");
-        router.push("/admin");
+        router.push("/admin/dashboard");
       } else {
         toast.error(data.error || "Invalid username or password.");
       }

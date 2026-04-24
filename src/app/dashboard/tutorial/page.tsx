@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 export default function TutorialPage() {
   const [tutorials, setTutorials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     async function fetchTutorials() {
@@ -24,6 +25,7 @@ export default function TutorialPage() {
       }
     }
     fetchTutorials();
+    setHasMounted(true);
   }, []);
 
   if (isLoading) {
@@ -36,7 +38,9 @@ export default function TutorialPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-2">
+      {hasMounted && (
+        <>
+          <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
           <BookOpen className="w-8 h-8 text-primary" />
           Tutorials & Guides
@@ -135,6 +139,8 @@ export default function TutorialPage() {
             </Link>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

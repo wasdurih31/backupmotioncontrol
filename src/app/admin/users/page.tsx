@@ -56,6 +56,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hasMounted, setHasMounted] = useState(false);
   
   // Sorting State
   const [sortBy, setSortBy] = useState<SortField>("none");
@@ -110,6 +111,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    setHasMounted(true);
   }, []);
 
   const openEditModal = (user: User) => {
@@ -243,18 +245,16 @@ export default function AdminUsersPage() {
             user.accessCode.toLowerCase().includes(searchLower));
   });
 
-  if (loading && users.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Synchronizing database...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 pb-20">
-      <div className="flex items-center justify-between">
+      {loading && users.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Synchronizing database...</p>
+        </div>
+      ) : hasMounted && (
+        <>
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2">Users Management</h1>
           <p className="text-muted-foreground">Manage subscriptions, bans, and access controls.</p>
@@ -468,7 +468,11 @@ export default function AdminUsersPage() {
                         <div className="space-y-1"><p className="text-5xl md:text-6xl font-bold text-red-500 tracking-tighter">{activityStats?.failed || 0}</p><div className="space-y-0"><p className="text-[10px] md:text-[11px] uppercase font-bold text-red-500/20 tracking-[0.2em]">Failed /</p><p className="text-[10px] md:text-[11px] uppercase font-bold text-red-500/20 tracking-[0.2em] -mt-1">Blocked</p></div></div>
                         <div className="text-right space-y-1"><p className="text-5xl md:text-6xl font-bold text-blue-400 tracking-tighter">{activityStats && (activityStats.success + activityStats.failed) > 0 ? Math.round((activityStats.success / (activityStats.success + activityStats.failed)) * 100) : 0}%</p><p className="text-[10px] md:text-[11px] uppercase font-bold text-blue-400/20 tracking-[0.2em]">Efficiency</p></div>
                       </div>
-                      <div className="h-2 md:h-3 bg-black/60 rounded-full overflow-hidden p-1 border border-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${activityStats && (activityStats.success + activityStats.failed) > 0 ? (activityStats.success / (activityStats.success + activityStats.failed)) * 100 : 0}%` }} transition={{ duration: 1.5, ease: "circOut" }} className="h-full bg-gradient-to-r from-blue-600 to-blue-300 rounded-full shadow-[0_0_30px_rgba(59,130,246,0.7)]" /></div>
+                      <div className="h-2 md:h-3 bg-black/60 rounded-full overflow-hidden p-1 border border-white/5">
+                        {hasMounted && (
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${activityStats && (activityStats.success + activityStats.failed) > 0 ? (activityStats.success / (activityStats.success + activityStats.failed)) * 100 : 0}%` }} transition={{ duration: 1.5, ease: "circOut" }} className="h-full bg-gradient-to-r from-blue-600 to-blue-300 rounded-full shadow-[0_0_30px_rgba(59,130,246,0.7)]" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -523,6 +527,8 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </div>
   );
 }

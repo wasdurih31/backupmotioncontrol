@@ -33,6 +33,7 @@ export default function DashboardLayout({
   const [user, setUser] = useState<any>(null);
   const isGenerating = useGenerateStore((s) => s.isSubmitting);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
@@ -52,6 +53,7 @@ export default function DashboardLayout({
       }
     }
     fetchUser();
+    setHasMounted(true);
   }, [router]);
 
   async function handleLogout() {
@@ -75,7 +77,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      {/* --- DESKTOP TOP NAVIGATION --- */}
+      {hasMounted && (
+        <>
+          {/* --- DESKTOP TOP NAVIGATION --- */}
       <header className="hidden md:flex h-16 border-b border-border/50 bg-card/20 backdrop-blur-xl items-center justify-between px-8 z-50 shrink-0">
         <div className="flex items-center gap-12">
           <Link href="/dashboard" className="font-bold text-lg tracking-tight shrink-0">
@@ -209,6 +213,8 @@ export default function DashboardLayout({
           </div>
         </div>
       </nav>
+      </>
+      )}
     </div>
   );
 }

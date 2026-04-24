@@ -254,6 +254,50 @@ const generateSchema = z.object({
   path: ["prompt"],
 });
 
+interface UploadZoneProps {
+  type: "video" | "image";
+  file: File | null;
+  previewUrl: string | null;
+  setFile: (file: File | null) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  isGenerating: boolean;
+}
+
+function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }: UploadZoneProps) {
+  const isVideo = type === "video";
+  const accept = isVideo ? ".mp4,.mov,.webm,.m4v" : ".png,.jpg,.jpeg,.webp";
+  const label = isVideo ? "Video" : "Image";
+  const formats = isVideo ? "MP4, MOV, WEBM" : "PNG, JPG, WEBP";
+  const Icon = isVideo ? VideoIcon : ImageIcon;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs font-medium leading-none flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="w-3.5 h-3.5" /> {isVideo ? "Ref" : "Char"} {label} <span className="text-red-500">*</span>
+      </label>
+      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
+      {file && previewUrl ? (
+        <div className="relative rounded-xl overflow-hidden border border-border bg-black/40 group flex items-center justify-center h-40">
+          {isVideo ? <video src={previewUrl} className="max-w-full max-h-full object-contain" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-lg" />}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+             {!isGenerating && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); }} className="p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white shadow-lg">
+                <X className="w-4 h-4" />
+              </button>
+             )}
+          </div>
+        </div>
+      ) : (
+        <div className={`border border-dashed border-border/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 h-40 ${isGenerating ? "opacity-50 pointer-events-none" : ""}`} onClick={() => inputRef.current?.click()}>
+          <UploadCloud className="h-6 w-6 text-muted-foreground mb-2" />
+          <p className="text-[10px] font-medium text-foreground">Upload {label}</p>
+          <p className="text-[9px] text-muted-foreground mt-0.5">{formats}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GenerateVideoPage() {
   const videoFile = useGenerateStore((s) => s.videoFile);
   const imageFile = useGenerateStore((s) => s.imageFile);
@@ -269,15 +313,32 @@ export default function GenerateVideoPage() {
   const activeTaskId = useGenerateStore((s) => s.activeTaskId);
   const pollingStatus = useGenerateStore((s) => s.pollingStatus);
   const loadLatestTask = useGenerateStore((s) => s.loadLatestTask);
+  const [hasMounted, setHasMounted] = useState(false);
 
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const resultSectionRef = useRef<HTMLDivElement>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
-  const videoPreviewUrl = useMemo(() => (videoFile ? URL.createObjectURL(videoFile) : null), [videoFile]);
-  const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
+  useEffect(() => {
+    if (videoFile) {
+      const url = URL.createObjectURL(videoFile);
+      setVideoPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setVideoPreviewUrl(null);
+    }
+  }, [videoFile]);
 
-  useEffect(() => { loadLatestTask(); }, [loadLatestTask]);
+  useEffect(() => {
+    if (imageFile) {
+      const url = URL.createObjectURL(imageFile);
+      setImagePreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setImagePreviewUrl(null);
+    }
+  }, [imageFile]);
+
+  useEffect(() => { loadLatestTask(); setHasMounted(true); }, [loadLatestTask]);
 
   const form = useForm<z.infer<typeof generateSchema>>({
     resolver: zodResolver(generateSchema),
@@ -340,46 +401,13 @@ export default function GenerateVideoPage() {
     runGeneration(values);
   }
 
-  const renderUploadZone = (type: "video" | "image") => {
-    const isVideo = type === "video";
-    const file = isVideo ? videoFile : imageFile;
-    const previewUrl = isVideo ? videoPreviewUrl : imagePreviewUrl;
-    const setFile = isVideo ? setVideoFile : setImageFile;
-    const inputRef = isVideo ? videoInputRef : imageInputRef;
-    const accept = isVideo ? ".mp4,.mov,.webm,.m4v" : ".png,.jpg,.jpeg,.webp";
-    const label = isVideo ? "Video" : "Image";
-    const formats = isVideo ? "MP4, MOV, WEBM" : "PNG, JPG, WEBP";
-    const Icon = isVideo ? VideoIcon : ImageIcon;
-
-    return (
-      <div className="space-y-2">
-        <label className="text-xs font-medium leading-none flex items-center gap-1.5 text-muted-foreground">
-          <Icon className="w-3.5 h-3.5" /> {isVideo ? "Ref" : "Char"} {label} <span className="text-red-500">*</span>
-        </label>
-        <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
-        {file && previewUrl ? (
-          <div className="relative rounded-xl overflow-hidden border border-border bg-black/40 group flex items-center justify-center h-40">
-            {isVideo ? <video src={previewUrl} className="max-w-full max-h-full object-contain" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-lg" />}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-               {!isGenerating && (
-                <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); }} className="p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white shadow-lg">
-                  <X className="w-4 h-4" />
-                </button>
-               )}
-            </div>
-          </div>
-        ) : (
-          <div className={`border border-dashed border-border/50 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all bg-card/20 h-40 ${isGenerating ? "opacity-50 pointer-events-none" : ""}`} onClick={() => inputRef.current?.click()}>
-            <UploadCloud className="h-6 w-6 text-muted-foreground mb-2" />
-            <p className="text-[10px] font-medium text-foreground">Upload {label}</p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{formats}</p>
-          </div>
-        )}
-      </div>
-    );
-  };
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const resultSectionRef = useRef<HTMLDivElement>(null);
 
   return ( <>
+    {hasMounted && (
+      <>
     <div className="max-w-[1400px] mx-auto min-h-full pb-12">
       <div className="flex flex-col md:flex-row gap-6 md:gap-10 h-full">
         
@@ -430,8 +458,24 @@ export default function GenerateVideoPage() {
               </div>
 
               <div className={form.watch("engine") === "kling" ? "grid grid-cols-2 gap-4" : "block"}>
-                {form.watch("engine") === "kling" && renderUploadZone("video")}
-                {renderUploadZone("image")}
+                {form.watch("engine") === "kling" && (
+                  <UploadZone 
+                    type="video" 
+                    file={videoFile} 
+                    previewUrl={videoPreviewUrl} 
+                    setFile={setVideoFile} 
+                    inputRef={videoInputRef} 
+                    isGenerating={isGenerating}
+                  />
+                )}
+                <UploadZone 
+                  type="image" 
+                  file={imageFile} 
+                  previewUrl={imagePreviewUrl} 
+                  setFile={setImageFile} 
+                  inputRef={imageInputRef} 
+                  isGenerating={isGenerating}
+                />
               </div>
 
               <div className="space-y-6">
@@ -672,7 +716,8 @@ export default function GenerateVideoPage() {
           <div className="h-32 md:hidden" />
         </main>
       </div>
-    </div>
-
-  </> );
+      </div>
+      </>
+      )}
+    </> );
 }
