@@ -239,7 +239,7 @@ const generateSchema = z.object({
   character_orientation: z.enum(["video", "image"]).optional(),
   cfg_scale: z.number().min(0).max(1).optional(),
   model: z.string().optional(),
-  engine: z.enum(["kling", "pixverse"]),
+  engine: z.enum(["kling", "pixverse", "kling_2_1_pro"]),
   resolution: z.enum(["360p", "540p", "720p", "1080p"]).optional(),
   duration: z.number().optional(),
   negative_prompt: z.string().optional(),
@@ -430,10 +430,10 @@ export default function GenerateVideoPage() {
                           <Sparkles className="w-4 h-4 text-blue-400" />
                           <div className="flex flex-col items-start leading-tight">
                             <span className="text-[10px] text-white/40 font-medium uppercase tracking-tighter">
-                              {field.value === "kling" ? "Kling" : "PixVerse"}
+                              {field.value === "pixverse" ? "PixVerse" : "Kling"}
                             </span>
                             <span className="text-xs font-bold text-foreground">
-                              {field.value === "kling" ? "Motion Control" : "Image to Video"}
+                              {field.value === "kling" ? "Motion Control" : field.value === "kling_2_1_pro" ? "Kling 2.1 Pro" : "Image to Video"}
                             </span>
                           </div>
                         </div>
@@ -443,6 +443,9 @@ export default function GenerateVideoPage() {
                           <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling AI Engine</SelectLabel>
                           <SelectItem value="kling" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
                             Motion Control
+                          </SelectItem>
+                          <SelectItem value="kling_2_1_pro" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Kling 2.1 Pro
                           </SelectItem>
                         </SelectGroup>
                         <SelectGroup>
@@ -592,7 +595,7 @@ export default function GenerateVideoPage() {
                           </FormItem>
                         )} />
                       </>
-                    ) : (
+                    ) : form.watch("engine") === "pixverse" ? (
                       <>
                         <div className="grid grid-cols-2 divide-x divide-border/30">
                           <FormField control={form.control} name="resolution" render={({ field }) => (
@@ -632,6 +635,7 @@ export default function GenerateVideoPage() {
                                 <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
                                   <SelectItem value="5" className="text-xs">5 Seconds</SelectItem>
                                   <SelectItem value="8" className="text-xs">8 Seconds</SelectItem>
+                                  <SelectItem value="10" className="text-xs">10 Seconds</SelectItem>
                                 </SelectContent>
                               </Select>
                             </FormItem>
@@ -678,7 +682,76 @@ export default function GenerateVideoPage() {
                           </FormItem>
                         )} />
                       </>
-                    )}
+                    ) : form.watch("engine") === "kling_2_1_pro" ? (
+                      <>
+                        <div className="grid grid-cols-1 divide-x divide-border/30">
+                          <FormField control={form.control} name="duration" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Clock className="w-3 h-3 text-amber-400/70" />
+                                Duration
+                              </FormLabel>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val || "5"))} value={field.value?.toString()}>
+                                <FormControl>
+                                  <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs hover:border-amber-500/30 transition-all focus:ring-1 focus:ring-amber-500/50">
+                                    <SelectValue placeholder="Select" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="5" className="text-xs">5 Seconds</SelectItem>
+                                  <SelectItem value="10" className="text-xs">10 Seconds</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                        </div>
+
+                        <FormField control={form.control} name="cfg_scale" render={({ field }) => (
+                          <FormItem className="p-4 space-y-4 hover:bg-white/[0.02] transition-colors border-t border-border/30">
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Terminal className="w-3 h-3 text-green-400/70" />
+                                Guidance Scale
+                              </FormLabel>
+                              <span className="text-[11px] font-mono font-bold text-green-400">{field.value?.toFixed(1)}</span>
+                            </div>
+                            <FormControl>
+                              <div className="px-1 py-1">
+                                <Input 
+                                  type="range" 
+                                  step="0.1" 
+                                  min="0" 
+                                  max="1" 
+                                  className="h-1.5 w-full bg-white/10 rounded-full appearance-none cursor-pointer accent-green-500 hover:accent-green-400 transition-all" 
+                                  {...field} 
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} 
+                                />
+                                <div className="flex justify-between mt-2 px-0.5">
+                                  <span className="text-[8px] text-white/20 font-bold">MIN</span>
+                                  <span className="text-[8px] text-white/20 font-bold">MAX</span>
+                                </div>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )} />
+
+                        <FormField control={form.control} name="negative_prompt" render={({ field }) => (
+                          <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors border-t border-border/30">
+                            <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                              <XCircle className="w-3 h-3 text-red-400/70" />
+                              Negative Prompt
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="What to exclude..." 
+                                className="bg-black/20 border-border/40 h-9 text-xs focus:border-red-500/30" 
+                                {...field} 
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </>
+                    ) : null}
                   </CardContent>
                 </Card>
               </div>

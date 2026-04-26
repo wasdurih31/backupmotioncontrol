@@ -107,6 +107,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // Determine polling endpoint based on task engine
     const pollingEndpoint = task.engine === 'pixverse'
       ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${taskId}`
+      : task.engine === 'kling_2_1_pro'
+      ? `https://api.freepik.com/v1/ai/image-to-video/kling-v2-1/${taskId}`
       : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${taskId}`;
 
     // Poll Freepik API

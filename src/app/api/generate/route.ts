@@ -62,6 +62,17 @@ export async function POST(req: Request) {
         negative_prompt: negative_prompt || "",
         art_style: style || undefined,
       };
+    } else if (engine === 'kling_2_1_pro') {
+      endpoint = 'https://api.freepik.com/v1/ai/image-to-video/kling-v2-1-pro';
+      payload = {
+        image: imageUrl,
+        prompt: prompt,
+        duration: duration ? duration.toString() : "5",
+        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+      };
+      if (negative_prompt) {
+        payload.negative_prompt = negative_prompt;
+      }
     } else {
       // Kling (default)
       endpoint = model === 'pro' 
