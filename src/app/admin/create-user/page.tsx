@@ -29,7 +29,7 @@ import {
 
 const createUserSchema = z.object({
   identifier: z.string().min(3, "Email/No HP is required"),
-  accessCode: z.string().regex(/^KEY-[A-Z0-9]{8}$/, "Access Code must match KEY-XXXXXXXX format"),
+  accessCode: z.string().min(3, "Access Code minimal 3 karakter"),
   subscriptionStart: z.string().optional(),
   subscriptionEnd: z.string().optional(),
 });
@@ -123,9 +123,9 @@ export default function CreateUserPage() {
                   name="accessCode"
                   render={({ field }) => (
                     <FormItem className="flex-1">
-                      <FormLabel>Access Code (KEY-XXXXXXXX)</FormLabel>
+                      <FormLabel>Access Code</FormLabel>
                       <FormControl>
-                        <Input placeholder="KEY-XXXXXXXX" className="bg-background/50 uppercase font-mono h-11" maxLength={12} {...field} />
+                        <Input placeholder="Custom Code or Generate..." className="bg-background/50 uppercase font-mono h-11" maxLength={20} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

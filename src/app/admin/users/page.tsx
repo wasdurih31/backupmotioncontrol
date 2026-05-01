@@ -64,6 +64,8 @@ export default function AdminUsersPage() {
   
   // Edit State
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editIdentifier, setEditIdentifier] = useState("");
+  const [editAccessCode, setEditAccessCode] = useState("");
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -116,6 +118,8 @@ export default function AdminUsersPage() {
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
+    setEditIdentifier(user.email || user.phone || "");
+    setEditAccessCode(user.accessCode || "");
     setEditStart(user.subscriptionStart ? user.subscriptionStart.split('T')[0] : "");
     setEditEnd(user.subscriptionEnd ? user.subscriptionEnd.split('T')[0] : "");
   };
@@ -128,17 +132,20 @@ export default function AdminUsersPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          id: editingUser.id, 
+          id: editingUser.id,
+          identifier: editIdentifier,
+          accessCode: editAccessCode,
           subscriptionStart: editStart || null, 
           subscriptionEnd: editEnd || null 
         }),
       });
       if (res.ok) {
-        toast.success("Subscription updated successfully");
+        toast.success("User details updated successfully");
         setEditingUser(null);
         fetchUsers();
       } else {
-        toast.error("Failed to update subscription");
+        const error = await res.json();
+        toast.error(error.error || "Failed to update user");
       }
     } catch (e) {
       toast.error("An error occurred");
@@ -388,7 +395,7 @@ export default function AdminUsersPage() {
                               <Activity className="w-4 h-4 text-blue-400" /> View Activity
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditModal(user)} className="cursor-pointer gap-2 rounded-lg py-2">
-                              <Calendar className="w-4 h-4 text-amber-400" /> Modify Expiry
+                              <Calendar className="w-4 h-4 text-amber-400" /> Modify User Data
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-border/50 mx-1" />
                             <DropdownMenuItem 
@@ -487,14 +494,32 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-amber-400" />
-              Modify Subscription
+              Modify User Details
             </DialogTitle>
             <DialogDescription>
-              Set the active period for <span className="font-bold text-foreground">{editingUser?.email || editingUser?.phone}</span>
+              Update information and active period for <span className="font-bold text-foreground">{editingUser?.id}</span>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar px-1">
+            <div className="space-y-2">
+              <Label htmlFor="edit-identifier" className="text-xs uppercase text-muted-foreground">Email / Phone Number</Label>
+              <Input 
+                id="edit-identifier" 
+                value={editIdentifier} 
+                onChange={(e) => setEditIdentifier(e.target.value)}
+                className="bg-card/30 h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-accessCode" className="text-xs uppercase text-muted-foreground">Access Code</Label>
+              <Input 
+                id="edit-accessCode" 
+                value={editAccessCode} 
+                onChange={(e) => setEditAccessCode(e.target.value.toUpperCase())}
+                className="bg-card/30 h-11 font-mono uppercase"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="start-date" className="text-xs uppercase text-muted-foreground">Subscription Start</Label>
               <Input 

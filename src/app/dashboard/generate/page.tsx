@@ -133,7 +133,7 @@ function ResultSection() {
             </div>
           </div>
           <div className="p-4 flex gap-3">
-            <a href={`/api/download?url=${encodeURIComponent(resultVideoUrl)}`} download className="flex-1">
+            <a href={`${resultVideoUrl}?download=1`} download className="flex-1">
               <Button type="button" size="lg" className="w-full bg-white text-black hover:bg-white/90 font-bold gap-2 text-sm shadow-lg shadow-white/5">
                 <Download className="w-4 h-4" /> Download Video
               </Button>
@@ -217,7 +217,7 @@ function GallerySection() {
                 <span className="text-[10px] text-muted-foreground font-mono">ID: {t.id.slice(0, 8)}</span>
                 <span className="text-[10px] text-muted-foreground">{new Date(t.createdAt).toLocaleTimeString()}</span>
               </div>
-              <a href={`/api/download?url=${encodeURIComponent(t.resultUrl)}`} download>
+              <a href={`${t.resultUrl}?download=1`} download>
                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
                   <Download className="w-4 h-4" />
                 </Button>

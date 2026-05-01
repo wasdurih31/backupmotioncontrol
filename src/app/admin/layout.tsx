@@ -13,7 +13,8 @@ import {
   Activity,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  Database
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -23,6 +24,7 @@ const adminLinks = [
   { name: "Create User", href: "/admin/create-user", icon: UserPlus },
   { name: "Live Activity", href: "/admin/activity", icon: Activity },
   { name: "Tutorials", href: "/admin/tutorials", icon: BookOpen },
+  { name: "Database Backup", href: "/admin/backup", icon: Database },
 ];
 
 function SidebarContent({ pathname, handleLogout }: { pathname: string, handleLogout: () => void }) {
