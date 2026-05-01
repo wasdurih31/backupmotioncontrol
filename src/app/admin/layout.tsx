@@ -32,8 +32,11 @@ function SidebarContent({ pathname, handleLogout }: { pathname: string, handleLo
     <>
       <div className="h-16 flex items-center px-6 border-b border-border/50 gap-2">
         <ShieldAlert className="w-5 h-5 text-red-500" />
-        <Link href="/admin/dashboard" className="font-bold text-lg tracking-tight text-foreground">
-          Admin <span className="text-muted-foreground">Panel</span>
+        <Link href="/admin/dashboard" className="font-bold text-lg tracking-tight text-foreground flex flex-col">
+          <div>Admin <span className="text-muted-foreground">Panel</span></div>
+          <span className="text-[10px] text-muted-foreground/70 -mt-1 font-normal tracking-normal">
+            {process.env.NEXT_PUBLIC_SITE_TYPE === 'BACKUP' ? 'Backup v1.0' : 'Main v1.0'}
+          </span>
         </Link>
       </div>
       
