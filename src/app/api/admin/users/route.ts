@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
-import { db } from '@/db';
+import { db, backupDb } from '@/db';
 import { users } from '@/db/schema';
 import { eq, desc, and, or, ne } from 'drizzle-orm';
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
     const id = `USR-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    await db.insert(users).values({
+    const insertData = {
       id,
       email: processedEmail,
       phone: processedPhone,
@@ -76,7 +76,14 @@ export async function POST(req: Request) {
       isActive: true,
       subscriptionStart: subscriptionStart ? new Date(subscriptionStart) : null,
       subscriptionEnd: subscriptionEnd ? new Date(subscriptionEnd) : null,
-    });
+    };
+
+    await db.insert(users).values(insertData);
+
+    // Auto-Sync to Backup Database
+    if (backupDb) {
+      backupDb.insert(users).values(insertData).catch((e: any) => console.error('Backup DB Sync Error (POST):', e));
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error) {
@@ -140,6 +147,11 @@ export async function PATCH(req: Request) {
 
     if (Object.keys(updateData).length > 0) {
       await db.update(users).set(updateData).where(eq(users.id, id));
+
+      // Auto-Sync to Backup Database
+      if (backupDb) {
+        backupDb.update(users).set(updateData).where(eq(users.id, id)).catch((e: any) => console.error('Backup DB Sync Error (PATCH):', e));
+      }
     }
 
     return NextResponse.json({ success: true });
@@ -161,6 +173,11 @@ export async function DELETE(req: Request) {
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     await db.delete(users).where(eq(users.id, id));
+
+    // Auto-Sync to Backup Database
+    if (backupDb) {
+      backupDb.delete(users).where(eq(users.id, id)).catch((e: any) => console.error('Backup DB Sync Error (DELETE):', e));
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
