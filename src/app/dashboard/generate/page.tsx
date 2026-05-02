@@ -19,6 +19,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useGenerateStore, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
+// Smart client-side download to save server bandwidth
+const handleSmartDownload = async (url: string, defaultFilename: string, e: React.MouseEvent) => {
+  e.preventDefault();
+  const toastId = toast.loading("Downloading video directly...");
+  try {
+    // Attempt client-side fetch to bypass server proxy (saves Vercel bandwidth)
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("CORS or Network issue");
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = defaultFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(blobUrl);
+    toast.success("Download complete!", { id: toastId });
+  } catch (error) {
+    toast.dismiss(toastId);
+    // Fallback: Open in new tab so user can right-click -> Save Video As
+    window.open(url, "_blank");
+  }
+};
+
 // ─── Process Monitor ─────────────────────────────────────────────────
 function ProcessMonitor({ steps, logs, isOpen, onToggle, isRunning }: {
   steps: PipelineStep[]; logs: LogEntry[]; isOpen: boolean; onToggle: () => void; isRunning: boolean;
@@ -133,11 +158,9 @@ function ResultSection() {
             </div>
           </div>
           <div className="p-4 flex gap-3">
-            <a href={`${resultVideoUrl}?download=1`} download className="flex-1">
-              <Button type="button" size="lg" className="w-full bg-white text-black hover:bg-white/90 font-bold gap-2 text-sm shadow-lg shadow-white/5">
-                <Download className="w-4 h-4" /> Download Video
-              </Button>
-            </a>
+            <Button type="button" size="lg" className="flex-1 bg-white text-black hover:bg-white/90 font-bold gap-2 text-sm shadow-lg shadow-white/5" onClick={(e) => handleSmartDownload(resultVideoUrl, `universeai-${activeTaskId?.slice(0, 8)}.mp4`, e)}>
+              <Download className="w-4 h-4" /> Download Video
+            </Button>
             <Button type="button" size="lg" variant="outline" className="flex-1 border-border/50 bg-transparent hover:bg-white/5 gap-2 text-sm" onClick={clearResult}>
               <RefreshCw className="w-4 h-4" /> Generate New
             </Button>
@@ -217,11 +240,9 @@ function GallerySection() {
                 <span className="text-[10px] text-muted-foreground font-mono">ID: {t.id.slice(0, 8)}</span>
                 <span className="text-[10px] text-muted-foreground">{new Date(t.createdAt).toLocaleTimeString()}</span>
               </div>
-              <a href={`${t.resultUrl}?download=1`} download>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white">
-                  <Download className="w-4 h-4" />
-                </Button>
-              </a>
+              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 hover:text-white" onClick={(e) => handleSmartDownload(t.resultUrl, `universeai-${t.id.slice(0, 8)}.mp4`, e)}>
+                <Download className="w-4 h-4" />
+              </Button>
             </div>
             <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[9px] text-white/70 border border-white/10 pointer-events-none">
               Auto-deletes in 30m
