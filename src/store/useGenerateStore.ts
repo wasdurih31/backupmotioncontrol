@@ -149,13 +149,20 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       const latest = tasks[0]; // already sorted by createdAt DESC
 
       if (latest.status === "processing" || latest.status === "queued") {
+        const startTime = latest.createdAt ? new Date(latest.createdAt).getTime() : Date.now();
+        const TIMEOUT_MS = 30 * 60 * 1000;
+        
+        // If task has timed out, ignore it so the UI stays clean (idle) for a new generation.
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          return;
+        }
+
         // Task still in progress — resume polling
         set({
           activeTaskId: latest.id,
           pollingStatus: "polling",
           hasRestoredTask: true,
         });
-        const startTime = latest.createdAt ? new Date(latest.createdAt).getTime() : Date.now();
         startPolling(latest.id, set, get, startTime);
       } else if (latest.status === "success" && latest.resultUrl) {
         // Task completed recently — show result
