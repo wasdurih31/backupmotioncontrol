@@ -31,9 +31,14 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const isGenerating = useGenerateStore((s) => s.isSubmitting);
+  const isSubmitting = useGenerateStore((s) => s.isSubmitting);
+  const pollingStatus = useGenerateStore((s) => s.pollingStatus);
+  const clearResult = useGenerateStore((s) => s.clearResult);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const isGenerating = isSubmitting || pollingStatus === "polling";
 
   useEffect(() => {
     async function fetchUser() {
@@ -56,8 +61,20 @@ export default function DashboardLayout({
     setHasMounted(true);
   }, [router]);
 
-  async function handleLogout() {
+  function handleLogoutClick() {
+    if (isGenerating) {
+      setShowLogoutConfirm(true);
+    } else {
+      executeLogout();
+    }
+  }
+
+  async function executeLogout() {
     try {
+      setShowLogoutConfirm(false);
+      if (isGenerating) {
+        clearResult(); // Forcefully stop local polling/generation process
+      }
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/');
     } catch (e) {
@@ -137,7 +154,7 @@ export default function DashboardLayout({
               <span className="font-medium text-foreground">{user.email || user.phone}</span>
             </div>
             <button
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="p-2 rounded-xl text-muted-foreground hover:text-white hover:bg-white/5 transition-all"
               title="Logout"
             >
@@ -164,7 +181,7 @@ export default function DashboardLayout({
             </div>
           </Link>
           <button
-            onClick={handleLogout}
+            onClick={handleLogoutClick}
             className="p-2 rounded-lg text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
           >
             <LogOut className="w-4 h-4" />
@@ -220,6 +237,40 @@ export default function DashboardLayout({
         </div>
       </nav>
       </>
+      )}
+
+      {/* --- LOGOUT CONFIRMATION MODAL --- */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-border/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-red-500/80" />
+            <h3 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-red-400" />
+              Peringatan
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Proses generate video sedang berjalan. Jika Anda keluar sekarang, proses tersebut akan dihentikan secara paksa.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 rounded-lg border border-border bg-transparent hover:bg-white/5 transition-colors text-sm font-medium"
+              >
+                Batalkan
+              </button>
+              <button 
+                onClick={executeLogout}
+                className="flex-1 py-2.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
+              >
+                Tetap Keluar
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

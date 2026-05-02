@@ -155,7 +155,8 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           pollingStatus: "polling",
           hasRestoredTask: true,
         });
-        startPolling(latest.id, set, get);
+        const startTime = latest.createdAt ? new Date(latest.createdAt).getTime() : Date.now();
+        startPolling(latest.id, set, get, startTime);
       } else if (latest.status === "success" && latest.resultUrl) {
         // Task completed recently — show result
         const expiresAt = latest.expiresAt ? new Date(latest.expiresAt).getTime() : 0;
@@ -348,7 +349,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       set({ isComplete: true, activeTaskId: taskId, pollingStatus: "polling" });
 
       // ── Start polling for result ──
-      startPolling(taskId, set, get);
+      startPolling(taskId, set, get, Date.now());
 
     } catch (error: any) {
       console.error(error);
@@ -367,13 +368,24 @@ function startPolling(
   taskId: string,
   set: (partial: Partial<GenerateState> | ((s: GenerateState) => Partial<GenerateState>)) => void,
   get: () => GenerateState,
+  startTime: number
 ) {
   let pollCount = 0;
+  const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   const poll = async () => {
     const state = get();
     // Stop if cleared or different task or already done
     if (state.activeTaskId !== taskId || state.pollingStatus !== "polling") return;
+
+    // Timeout check
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      set((s) => ({
+        pollingStatus: "failed",
+        logs: [...s.logs, { time: now(), level: "error", message: "✗ Generation timed out (30 mins). Please try again." }]
+      }));
+      return;
+    }
 
     pollCount++;
     try {
