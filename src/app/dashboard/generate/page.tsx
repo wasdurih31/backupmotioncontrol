@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGenerateStore, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
+import { useGenerateStore, MAX_CONCURRENT_TASKS, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
 // Smart client-side download to save server bandwidth
@@ -254,6 +254,92 @@ function GallerySection() {
   );
 }
 
+// ─── Active Tasks List — menampilkan semua task yang sedang diproses ──
+function ActiveTasksList() {
+  const tasks = useGenerateStore((s) => s.tasks);
+  const focusedTaskId = useGenerateStore((s) => s.focusedTaskId);
+  const focusTask = useGenerateStore((s) => s.focusTask);
+  const dismissTask = useGenerateStore((s) => s.dismissTask);
+
+  // Tick setiap detik untuk update "elapsed" di UI tanpa memanggil Date.now()
+  // selama render (yang tidak pure).
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const list = useMemo(
+    () => Object.values(tasks).sort((a, b) => b.startedAt - a.startedAt),
+    [tasks],
+  );
+
+  if (list.length === 0) return null;
+
+  const fmtElapsed = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m > 0 ? `${m}m ${r}s` : `${r}s`;
+  };
+
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-amber-400" />
+          <span className="text-sm font-medium text-foreground">Proses Berjalan</span>
+          <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
+            {list.filter((t) => t.status === "polling").length}/{MAX_CONCURRENT_TASKS}
+          </span>
+        </div>
+      </div>
+      <div className="divide-y divide-border/20">
+        {list.map((t) => {
+          const isFocused = t.taskId === focusedTaskId;
+          const elapsed = nowMs - t.startedAt;
+          return (
+            <div
+              key={t.taskId}
+              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isFocused ? "bg-blue-500/5" : "hover:bg-white/[0.03]"}`}
+              onClick={() => focusTask(t.taskId)}
+            >
+              <div className="shrink-0">
+                {t.status === "polling" && <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />}
+                {t.status === "completed" && <CheckCircle2 className="w-4 h-4 text-green-400" />}
+                {t.status === "failed" && <XCircle className="w-4 h-4 text-red-400" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-foreground truncate">{t.taskId.slice(0, 12)}...</span>
+                  {t.engine && (
+                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-white/50">
+                      {t.engine}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {t.status === "polling" ? `Running · ${fmtElapsed(elapsed)}` : t.status === "completed" ? "Selesai" : "Gagal"}
+                </span>
+              </div>
+              {t.status !== "polling" && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); dismissTask(t.taskId); }}
+                  className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────
 const generateSchema = z.object({
   prompt: z.string().max(2500, "Prompt cannot exceed 2500 characters").optional(),
@@ -331,7 +417,6 @@ export default function GenerateVideoPage() {
   const monitorOpen = useGenerateStore((s) => s.monitorOpen);
   const setMonitorOpen = useGenerateStore((s) => s.setMonitorOpen);
   const runGeneration = useGenerateStore((s) => s.runGeneration);
-  const activeTaskId = useGenerateStore((s) => s.activeTaskId);
   const pollingStatus = useGenerateStore((s) => s.pollingStatus);
   const loadLatestTask = useGenerateStore((s) => s.loadLatestTask);
   const [hasMounted, setHasMounted] = useState(false);
@@ -396,29 +481,35 @@ export default function GenerateVideoPage() {
   }, [errors]);
 
   const isGenerating = isSubmitting || pollingStatus === "polling";
-  const isBlocked = !!activeTaskId && pollingStatus !== "completed" && pollingStatus !== "failed";
+  // Hitung jumlah task yang sedang diproses (polling) untuk UI slot counter.
+  const tasksMap = useGenerateStore((s) => s.tasks);
+  const activeCount = useMemo(
+    () => Object.values(tasksMap).filter((t) => t.status === "polling").length,
+    [tasksMap],
+  );
+  const slotsFull = activeCount >= MAX_CONCURRENT_TASKS;
 
   async function onSubmit(values: z.infer<typeof generateSchema>) {
     console.log("Submit Clicked", values);
-    toast.info("Starting process...");
 
     if (values.engine === "kling") {
-      if (!videoFile || !imageFile) { 
-        toast.error("Both a reference video AND a character image are required for Kling."); 
-        return; 
+      if (!videoFile || !imageFile) {
+        toast.error("Both a reference video AND a character image are required for Kling.");
+        return;
       }
     } else {
-      if (!imageFile) { 
-        toast.error("A source image is required for PixVerse."); 
-        return; 
+      if (!imageFile) {
+        toast.error("A source image is required for PixVerse.");
+        return;
       }
     }
-    
-    if (isBlocked) { 
-      toast.error(`System busy: Task ${activeTaskId} is ${pollingStatus}. Please wait.`); 
-      return; 
+
+    if (slotsFull) {
+      toast.error(`Slot penuh: ${activeCount}/${MAX_CONCURRENT_TASKS} proses sedang berjalan. Tunggu salah satu selesai.`);
+      return;
     }
-    
+
+    toast.info(`Memulai proses (${activeCount + 1}/${MAX_CONCURRENT_TASKS})...`);
     runGeneration(values);
   }
 
@@ -777,22 +868,43 @@ export default function GenerateVideoPage() {
                 </Card>
               </div>
 
-              <div className="pt-4 pb-4 md:static md:p-0">
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="bg-blue-600 text-white hover:bg-blue-500 font-bold px-8 w-full gap-2 relative overflow-hidden group shadow-xl shadow-blue-500/10 h-12" 
-                  disabled={isGenerating || isBlocked}
+              <div className="pt-4 pb-4 md:static md:p-0 space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Slot Proses</span>
+                  <span className={`text-[10px] font-mono font-bold ${slotsFull ? "text-red-400" : activeCount > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                    {activeCount}/{MAX_CONCURRENT_TASKS}
+                  </span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${slotsFull ? "bg-red-500" : activeCount > 0 ? "bg-amber-500" : "bg-white/10"}`}
+                    style={{ width: `${(activeCount / MAX_CONCURRENT_TASKS) * 100}%` }}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="bg-blue-600 text-white hover:bg-blue-500 font-bold px-8 w-full gap-2 relative overflow-hidden group shadow-xl shadow-blue-500/10 h-12"
+                  disabled={isSubmitting || slotsFull}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="h-5 w-5 animate-spin" /> UPLOADING...</>
-                  ) : isBlocked ? (
-                    <><Loader2 className="h-5 w-5 animate-spin" /> SYSTEM BUSY ({pollingStatus})</>
+                  ) : slotsFull ? (
+                    <><Clock className="h-5 w-5" /> SLOT PENUH ({activeCount}/{MAX_CONCURRENT_TASKS})</>
                   ) : (
-                    <><Sparkles className="h-5 w-5" /> START GENERATE</>
+                    <><Sparkles className="h-5 w-5" /> START GENERATE{activeCount > 0 ? ` (+${activeCount} BERJALAN)` : ""}</>
                   )}
                 </Button>
-                {isBlocked && !isSubmitting && <p className="text-[10px] text-center text-muted-foreground mt-2 animate-pulse">Processing on server. Please wait...</p>}
+                {slotsFull && (
+                  <p className="text-[10px] text-center text-muted-foreground mt-1 animate-pulse">
+                    Menunggu salah satu proses selesai untuk memulai yang baru.
+                  </p>
+                )}
+                {!slotsFull && activeCount > 0 && (
+                  <p className="text-[10px] text-center text-muted-foreground mt-1">
+                    Kamu masih bisa memulai {MAX_CONCURRENT_TASKS - activeCount} proses lagi secara paralel.
+                  </p>
+                )}
               </div>
             </form>
           </Form>
@@ -802,6 +914,7 @@ export default function GenerateVideoPage() {
         <main className="flex-1 min-w-0 space-y-8">
           <div className="space-y-8">
             {showMonitor && <ProcessMonitor steps={steps} logs={logs} isOpen={monitorOpen} onToggle={() => setMonitorOpen(!monitorOpen)} isRunning={isSubmitting} />}
+            <ActiveTasksList />
             <div ref={resultSectionRef}><ResultSection /></div>
             <GallerySection />
           </div>

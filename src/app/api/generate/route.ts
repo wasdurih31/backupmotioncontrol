@@ -4,9 +4,13 @@ import { jwtVerify } from 'jose';
 import { del } from '@vercel/blob';
 import { db } from '@/db';
 import { users, tasks } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { runFreepikCall } from '@/lib/freepikQueue';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'universeai-super-secret-key-2026');
+
+// Maksimum task berjalan bersamaan per user (status: queued / processing).
+const MAX_CONCURRENT_PER_USER = 5;
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -16,9 +20,23 @@ async function getSession() {
   try {
     const { payload } = await jwtVerify(session, JWT_SECRET);
     return payload as { id: string; role: string; accessCode: string };
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
+}
+
+/** Hitung task aktif user (queued + processing). */
+async function countActive(userId: string): Promise<number> {
+  const rows = await db
+    .select({ c: sql<number>`count(*)::int` })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        inArray(tasks.status, ['queued', 'processing']),
+      ),
+    );
+  return rows[0]?.c ?? 0;
 }
 
 export async function POST(req: Request) {
@@ -26,16 +44,28 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { 
+    const {
       videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine,
-      resolution, duration, negative_prompt, style
+      resolution, duration, negative_prompt, style,
     } = await req.json();
 
     if (!imageUrl || (engine === 'kling' && !videoUrl)) {
       return NextResponse.json({ error: 'Image (and Video for Kling) URLs are required' }, { status: 400 });
     }
 
-    // Get user's API Key
+    // ── Pre-check slot concurrency user ──
+    const preCount = await countActive(session.id);
+    if (preCount >= MAX_CONCURRENT_PER_USER) {
+      await cleanupBlobs([videoUrl, imageUrl]);
+      return NextResponse.json({
+        error: `Batas maksimum ${MAX_CONCURRENT_PER_USER} proses berjalan tercapai. Tunggu salah satu selesai sebelum memulai baru.`,
+        code: 'TOO_MANY_ACTIVE',
+        active: preCount,
+        limit: MAX_CONCURRENT_PER_USER,
+      }, { status: 429 });
+    }
+
+    // ── Ambil API key user ──
     const userResult = await db.select({
       id: users.id,
       apiKey: users.apiKey,
@@ -43,23 +73,24 @@ export async function POST(req: Request) {
     }).from(users).where(eq(users.id, session.id)).limit(1);
 
     if (!userResult.length || !userResult[0].apiKey) {
+      await cleanupBlobs([videoUrl, imageUrl]);
       return NextResponse.json({ error: 'API Key not found. Please configure it in Profile Settings.' }, { status: 400 });
     }
 
     const user = userResult[0];
 
-    // Determine Freepik endpoint and payload
+    // ── Tentukan endpoint & payload Freepik ──
     let endpoint = '';
-    let payload: any = {};
+    let payload: Record<string, unknown> = {};
 
     if (engine === 'pixverse') {
       endpoint = 'https://api.freepik.com/v1/ai/image-to-video/pixverse-v5';
       payload = {
         image_url: imageUrl,
         prompt: prompt,
-        resolution: resolution || "720p",
+        resolution: resolution || '720p',
         duration: duration || 5,
-        negative_prompt: negative_prompt || "",
+        negative_prompt: negative_prompt || '',
         art_style: style || undefined,
       };
     } else if (engine === 'kling_2_1_pro') {
@@ -67,34 +98,29 @@ export async function POST(req: Request) {
       payload = {
         image: imageUrl,
         prompt: prompt,
-        duration: duration ? duration.toString() : "5",
+        duration: duration ? duration.toString() : '5',
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
       };
       if (negative_prompt) {
-        payload.negative_prompt = negative_prompt;
+        (payload as Record<string, unknown>).negative_prompt = negative_prompt;
       }
     } else {
       // Kling (default)
-      endpoint = model === 'pro' 
+      endpoint = model === 'pro'
         ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
         : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
-      
+
       payload = {
         video_url: videoUrl,
         image_url: imageUrl,
-        prompt: prompt || "",
-        character_orientation: character_orientation || "video",
+        prompt: prompt || '',
+        character_orientation: character_orientation || 'video',
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
       };
     }
 
-    // Apply a global staggered delay (2 to 6 seconds) to prevent simultaneous API clashes and bot-like behavior
-    const randomDelay = Math.floor(Math.random() * 4000) + 2000;
-    console.log(`[Security] Staggering request by ${randomDelay}ms for user ${user.id} to avoid API clashes...`);
-    await new Promise((resolve) => setTimeout(resolve, randomDelay));
-
-    // Call Freepik API
-    const freepikRes = await fetch(endpoint, {
+    // ── Serialisasi call ke Freepik (untuk POST submit) ──
+    const freepikRes = await runFreepikCall(() => fetch(endpoint, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -102,15 +128,16 @@ export async function POST(req: Request) {
         'x-freepik-api-key': user.apiKey as string,
       },
       body: JSON.stringify(payload),
-    });
+    }));
 
     const freepikData = await freepikRes.json();
 
-    // HTTP error (non‑2xx)
     if (!freepikRes.ok) {
       console.error('Freepik API Error Full:', JSON.stringify(freepikData, null, 2));
       await cleanupBlobs([videoUrl, imageUrl]);
-      return NextResponse.json({ error: `${freepikData.message || 'Failed to generate video'}: ${JSON.stringify(freepikData)}` }, { status: freepikRes.status });
+      return NextResponse.json({
+        error: `${freepikData.message || 'Failed to generate video'}: ${JSON.stringify(freepikData)}`,
+      }, { status: freepikRes.status });
     }
 
     const taskId = freepikData?.data?.task_id || freepikData?.task_id;
@@ -120,25 +147,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid response from Freepik API' }, { status: 500 });
     }
 
-    // Insert task to DB — store source blob URLs so we can clean them up later
+    // ── Simpan task ke DB ──
     await db.insert(tasks).values({
       id: taskId,
       userId: user.id,
       prompt: prompt || null,
-      videoUrl: videoUrl || null,   
-      imageUrl: imageUrl,   
+      videoUrl: videoUrl || null,
+      imageUrl: imageUrl,
       characterOrientation: character_orientation || null,
       engine: engine || 'kling',
       model: model || 'motion_control_std',
       status: 'processing',
     });
 
-    // Increment totalGenerate
+    // ── Post-check: detect race condition ──
+    // Kalau antara pre-check dan insert tadi ada request lain yang juga lolos
+    // dan membuat total > MAX, rollback row ini dan tolak user yang "kalah".
+    const postCount = await countActive(user.id);
+    if (postCount > MAX_CONCURRENT_PER_USER) {
+      console.warn(`[Race] User ${user.id} post-insert count=${postCount}, rolling back ${taskId}`);
+      // Hapus row yang baru saja dibuat — user harus submit ulang.
+      await db.delete(tasks).where(eq(tasks.id, taskId));
+      await cleanupBlobs([videoUrl, imageUrl]);
+      // NOTE: task di sisi Freepik tetap berjalan dan akan expired sendiri.
+      // Tidak perfect tapi dalam praktik jarang tercapai karena frontend
+      // sudah disable tombol saat isSubmitting.
+      return NextResponse.json({
+        error: `Batas ${MAX_CONCURRENT_PER_USER} proses bersamaan tercapai (race). Silakan coba lagi.`,
+        code: 'TOO_MANY_ACTIVE',
+        active: postCount,
+        limit: MAX_CONCURRENT_PER_USER,
+      }, { status: 429 });
+    }
+
+    // Naikkan totalGenerate
     await db.update(users)
       .set({ totalGenerate: (user.totalGenerate || 0) + 1 })
       .where(eq(users.id, user.id));
 
-    return NextResponse.json({ success: true, taskId });
+    return NextResponse.json({
+      success: true,
+      taskId,
+      active: postCount,
+      limit: MAX_CONCURRENT_PER_USER,
+    });
   }
   catch (error) {
     console.error('Generate Error:', error);

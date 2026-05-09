@@ -111,7 +111,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       ? `https://api.freepik.com/v1/ai/image-to-video/kling-v2-1/${taskId}`
       : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${taskId}`;
 
-    // Poll Freepik API
+    // Poll Freepik API.
+    // NOTE: polling sengaja TIDAK dibungkus `runFreepikCall` karena kini
+    // polling berjalan jarang (first poll 5m, selanjutnya 30–90s random)
+    // sehingga risiko clash rendah. Queue global hanya dipakai untuk POST
+    // submit yang volumenya tinggi di awal.
     const freepikRes = await fetch(pollingEndpoint, {
       headers: {
         'Accept': 'application/json',

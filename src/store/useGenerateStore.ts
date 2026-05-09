@@ -33,12 +33,27 @@ interface GenerateFormValues {
 
 export type PollingStatus = "idle" | "polling" | "completed" | "failed";
 
+export interface ActiveTask {
+  taskId: string;
+  status: "polling" | "completed" | "failed";
+  resultUrl: string | null;
+  startedAt: number;
+  engine?: string;
+  preview?: {
+    imagePreviewUrl?: string | null;
+    videoPreviewUrl?: string | null;
+  };
+}
+
+// Batas slot harus konsisten dengan server (`/api/generate`).
+export const MAX_CONCURRENT_TASKS = 5;
+
 interface GenerateState {
-  // Files
+  // Files (untuk form aktif saat ini)
   videoFile: File | null;
   imageFile: File | null;
 
-  // Pipeline
+  // Pipeline (untuk submit yang sedang berlangsung)
   steps: PipelineStep[];
   logs: LogEntry[];
   isSubmitting: boolean;
@@ -46,11 +61,19 @@ interface GenerateState {
   monitorOpen: boolean;
   isComplete: boolean;
 
-  // Result / Polling
+  // Task list — sekarang support banyak task paralel
+  tasks: Record<string, ActiveTask>;
+  // Task yang sedang di-highlight (terakhir selesai / terakhir dibuat)
+  focusedTaskId: string | null;
+
+  // Untuk kompat UI lama
   activeTaskId: string | null;
   resultVideoUrl: string | null;
   pollingStatus: PollingStatus;
-  hasRestoredTask: boolean; // true if we loaded a task from DB on page load
+  hasRestoredTask: boolean;
+
+  // Gallery
+  galleryRefreshTrigger: number;
 
   // Actions
   setVideoFile: (f: File | null) => void;
@@ -58,7 +81,8 @@ interface GenerateState {
   setMonitorOpen: (open: boolean) => void;
   resetPipeline: () => void;
   clearResult: () => void;
-  galleryRefreshTrigger: number;
+  dismissTask: (taskId: string) => void;
+  focusTask: (taskId: string | null) => void;
   triggerGalleryRefresh: () => void;
   loadLatestTask: () => Promise<void>;
   runGeneration: (values: GenerateFormValues) => Promise<void>;
@@ -83,7 +107,32 @@ const INITIAL_STEPS: PipelineStep[] = [
   { id: "save_task", label: "Save Task to Database", status: "idle" },
 ];
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_FIRST_DELAY_MS = 5 * 60 * 1000; // first poll: 5 menit setelah task dibuat
+const POLL_MIN_INTERVAL_MS = 30 * 1000;    // minimum 30s antar poll berikutnya
+const POLL_MAX_INTERVAL_MS = 90 * 1000;    // maximum 90s antar poll berikutnya
+const TASK_TIMEOUT_MS = 40 * 60 * 1000;   // 40 menit timeout (motion control 8–15m + margin)
+
+// Menyimpan task yang sedang aktif di-poll agar tidak dobel polling bila
+// `loadLatestTask` dipanggil berkali-kali.
+const polling = new Set<string>();
+
+// ─── Helper untuk turunkan UI-compat state dari tasks map ─────────────
+function deriveUiState(
+  tasks: Record<string, ActiveTask>,
+  focusedId: string | null,
+): { activeTaskId: string | null; resultVideoUrl: string | null; pollingStatus: PollingStatus } {
+  const task = focusedId ? tasks[focusedId] : null;
+  if (!task) {
+    return { activeTaskId: null, resultVideoUrl: null, pollingStatus: "idle" };
+  }
+  const pollingStatus: PollingStatus =
+    task.status === "polling" ? "polling" : task.status === "completed" ? "completed" : "failed";
+  return {
+    activeTaskId: task.taskId,
+    resultVideoUrl: task.resultUrl,
+    pollingStatus,
+  };
+}
 
 // ─── Store ───────────────────────────────────────────────────────────
 export const useGenerateStore = create<GenerateState>((set, get) => ({
@@ -95,6 +144,9 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
   showMonitor: false,
   monitorOpen: false,
   isComplete: false,
+
+  tasks: {},
+  focusedTaskId: null,
 
   activeTaskId: null,
   resultVideoUrl: null,
@@ -117,8 +169,28 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       isComplete: false,
     }),
 
+  // Hapus 1 task dari tampilan (misal setelah download / ditolak user).
+  dismissTask: (taskId) => set((s) => {
+    const { [taskId]: _removed, ...rest } = s.tasks;
+    const focusedTaskId = s.focusedTaskId === taskId ? null : s.focusedTaskId;
+    return {
+      tasks: rest,
+      focusedTaskId,
+      ...deriveUiState(rest, focusedTaskId),
+    };
+  }),
+
+  // Fokuskan (highlight) task tertentu di ResultSection.
+  focusTask: (taskId) => set((s) => ({
+    focusedTaskId: taskId,
+    ...deriveUiState(s.tasks, taskId),
+  })),
+
+  // Bersihkan SEMUA state (reset form + hapus semua kartu task dari layar).
   clearResult: () =>
     set({
+      tasks: {},
+      focusedTaskId: null,
       activeTaskId: null,
       resultVideoUrl: null,
       pollingStatus: "idle",
@@ -133,67 +205,97 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       imageFile: null,
     }),
 
-  // ── Load latest task from DB on page load ──
+  // Restore semua task aktif / baru selesai dari DB saat halaman di-mount.
   loadLatestTask: async () => {
-    // Don't reload if we already have an active task in memory
-    const state = get();
-    if (state.activeTaskId || state.isSubmitting) return;
-
+    if (get().hasRestoredTask) return;
     try {
       const res = await fetch("/api/tasks");
       if (!res.ok) return;
       const json = await res.json();
-      const tasks = json.data;
-      if (!tasks || tasks.length === 0) return;
+      const list: Array<{
+        id: string;
+        status: string;
+        resultUrl: string | null;
+        createdAt: string | Date | null;
+        expiresAt: string | Date | null;
+        engine?: string;
+      }> = json.data || [];
+      if (list.length === 0) {
+        set({ hasRestoredTask: true });
+        return;
+      }
 
-      const latest = tasks[0]; // already sorted by createdAt DESC
+      const nowMs = Date.now();
+      const restored: Record<string, ActiveTask> = {};
+      let latestCompletedId: string | null = null;
+      let latestCompletedAt = 0;
 
-      if (latest.status === "processing" || latest.status === "queued") {
-        const startTime = latest.createdAt ? new Date(latest.createdAt).getTime() : Date.now();
-        const TIMEOUT_MS = 30 * 60 * 1000;
-        
-        // If task has timed out, ignore it so the UI stays clean (idle) for a new generation.
-        if (Date.now() - startTime > TIMEOUT_MS) {
-          return;
-        }
+      for (const t of list) {
+        const createdAt = t.createdAt ? new Date(t.createdAt).getTime() : nowMs;
 
-        // Task still in progress — resume polling
-        set({
-          activeTaskId: latest.id,
-          pollingStatus: "polling",
-          hasRestoredTask: true,
-        });
-        startPolling(latest.id, set, get, startTime);
-      } else if (latest.status === "success" && latest.resultUrl) {
-        // Task completed recently — show result
-        const expiresAt = latest.expiresAt ? new Date(latest.expiresAt).getTime() : 0;
-        if (expiresAt > Date.now()) {
-          set({
-            activeTaskId: latest.id,
-            resultVideoUrl: latest.resultUrl,
-            pollingStatus: "completed",
-            hasRestoredTask: true,
-          });
+        if (t.status === "processing" || t.status === "queued") {
+          if (nowMs - createdAt > TASK_TIMEOUT_MS) continue; // skip yang sudah timeout
+          restored[t.id] = {
+            taskId: t.id,
+            status: "polling",
+            resultUrl: null,
+            startedAt: createdAt,
+            engine: t.engine,
+          };
+          startPolling(t.id, set, get, createdAt);
+        } else if (t.status === "success" && t.resultUrl) {
+          const expiresAt = t.expiresAt ? new Date(t.expiresAt).getTime() : 0;
+          if (expiresAt > nowMs) {
+            restored[t.id] = {
+              taskId: t.id,
+              status: "completed",
+              resultUrl: t.resultUrl,
+              startedAt: createdAt,
+              engine: t.engine,
+            };
+            if (createdAt > latestCompletedAt) {
+              latestCompletedAt = createdAt;
+              latestCompletedId = t.id;
+            }
+          }
         }
       }
+
+      // Prioritas fokus: task yang sedang polling > task terakhir selesai
+      const firstPolling = Object.values(restored).find((t) => t.status === "polling");
+      const focusedTaskId = firstPolling?.taskId || latestCompletedId;
+
+      set({
+        tasks: restored,
+        focusedTaskId,
+        hasRestoredTask: true,
+        ...deriveUiState(restored, focusedTaskId),
+      });
     } catch (e) {
       console.error("Failed to load latest task:", e);
+      set({ hasRestoredTask: true });
     }
   },
 
   runGeneration: async (values) => {
-    const { videoFile, imageFile, activeTaskId } = get();
-    
-    // ── Validation based on Engine ──
+    const { videoFile, imageFile, isSubmitting, tasks } = get();
+
+    // ── Validasi file ──
     if (values.engine === "kling") {
       if (!videoFile || !imageFile) return;
     } else {
       if (!imageFile) return;
     }
 
-    // ── Block if a task is actively running ──
-    const { pollingStatus, isSubmitting } = get();
-    if (pollingStatus === "polling" || isSubmitting) return;
+    // Cegah double-submit dari tombol yang sama (race sekejap).
+    if (isSubmitting) return;
+
+    // Cek limit lokal (server tetap enforce — ini hanya UX).
+    const activeCount = Object.values(tasks).filter((t) => t.status === "polling").length;
+    if (activeCount >= MAX_CONCURRENT_TASKS) {
+      // Tidak throw — cukup abaikan. UI sudah men-disable tombol.
+      return;
+    }
 
     const addLog = (level: LogEntry["level"], message: string) => {
       set((s) => ({ logs: [...s.logs, { time: now(), level, message }] }));
@@ -202,12 +304,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     const updateStep = (id: string, status: StepStatus, detail?: string) => {
       set((s) => ({
         steps: s.steps.map((step) =>
-          step.id === id ? { ...step, status, detail, timestamp: now() } : step
+          step.id === id ? { ...step, status, detail, timestamp: now() } : step,
         ),
       }));
     };
 
-    // Reset and start
+    // Reset pipeline untuk submit baru (tapi jangan sentuh `tasks`).
     set({
       steps: INITIAL_STEPS.map((s) => ({ ...s })),
       logs: [],
@@ -215,10 +317,6 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       showMonitor: true,
       monitorOpen: true,
       isComplete: false,
-      resultVideoUrl: null,
-      pollingStatus: "idle",
-      activeTaskId: null,
-      hasRestoredTask: false,
     });
 
     try {
@@ -227,7 +325,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       addLog("info", `Engine: ${values.engine.toUpperCase()}`);
       addLog("info", "Validating input files...");
       if (videoFile) addLog("info", `Video: ${videoFile.name} (${(videoFile.size / 1048576).toFixed(1)} MB)`);
-      addLog("info", `Image: ${imageFile.name} (${(imageFile.size / 1048576).toFixed(1)} MB)`); 
+      if (imageFile) addLog("info", `Image: ${imageFile.name} (${(imageFile.size / 1048576).toFixed(1)} MB)`);
 
       if (videoFile && videoFile.size > 500 * 1048576) {
         updateStep("validate", "error", "Video exceeds 500 MB");
@@ -271,14 +369,14 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
       // ── Step 3: Upload Image ──
       updateStep("upload_image", "running", "Uploading...");
-      addLog("info", `Uploading image to Vercel Blob (${(imageFile.size / 1048576).toFixed(1)} MB)...`);
+      addLog("info", `Uploading image to Vercel Blob (${(imageFile!.size / 1048576).toFixed(1)} MB)...`);
 
       let imageBlobUrl: string;
       try {
         const iRes = await fetch("/api/upload", {
           method: "POST",
-          headers: { "x-vercel-blob-filename": imageFile.name },
-          body: imageFile,
+          headers: { "x-vercel-blob-filename": imageFile!.name },
+          body: imageFile!,
         });
         if (!iRes.ok) {
           const errData = await iRes.json().catch(() => ({ error: `HTTP ${iRes.status}` }));
@@ -302,9 +400,9 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       updateStep("verify_key", "success", "Valid");
       addLog("success", "✓ API key verified");
 
-      // ── Step 5: Submit to Freepik ──
-      updateStep("call_api", "running", "Sending request...");
-      addLog("info", "POST → Freepik Kling v2.6 Motion Control API");
+      // ── Step 5: Submit ke Freepik ──
+      updateStep("call_api", "running", "Antri di queue Freepik...");
+      addLog("info", "POST → Freepik API (dijadwalkan oleh queue)");
       addLog("info", `Params: orientation=${values.character_orientation}, cfg=${values.cfg_scale}`);
 
       const generateRes = await fetch("/api/generate", {
@@ -328,6 +426,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       const generateData = await generateRes.json();
 
       if (!generateRes.ok) {
+        if (generateData.code === "TOO_MANY_ACTIVE") {
+          const msg = `Batas ${generateData.limit || MAX_CONCURRENT_TASKS} proses bersamaan tercapai. Tunggu salah satu selesai.`;
+          updateStep("call_api", "error", msg);
+          addLog("error", `✗ ${msg}`);
+          throw new Error(msg);
+        }
         const errMsg = generateData.error || `HTTP ${generateRes.status}`;
         updateStep("call_api", "error", errMsg);
         addLog("error", `✗ API Error: ${errMsg}`);
@@ -353,10 +457,31 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       addLog("success", "🎉 Generation queued successfully!");
       addLog("info", "Waiting for Freepik to process your video...");
 
-      set({ isComplete: true, activeTaskId: taskId, pollingStatus: "polling" });
+      // Tambahkan task ke map & fokuskan ke task baru ini.
+      const startedAt = Date.now();
+      set((s) => {
+        const newTasks: Record<string, ActiveTask> = {
+          ...s.tasks,
+          [taskId]: {
+            taskId,
+            status: "polling",
+            resultUrl: null,
+            startedAt,
+            engine: values.engine,
+          },
+        };
+        return {
+          isComplete: true,
+          tasks: newTasks,
+          focusedTaskId: taskId,
+          ...deriveUiState(newTasks, taskId),
+        };
+      });
 
-      // ── Start polling for result ──
-      startPolling(taskId, set, get, Date.now());
+      // Bersihkan file di form agar siap untuk submit berikutnya.
+      set({ videoFile: null, imageFile: null });
+
+      startPolling(taskId, set, get, startedAt);
 
     } catch (error: any) {
       console.error(error);
@@ -371,64 +496,88 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 }));
 
 // ─── Polling Function ────────────────────────────────────────────────
-function startPolling(
-  taskId: string,
-  set: (partial: Partial<GenerateState> | ((s: GenerateState) => Partial<GenerateState>)) => void,
-  get: () => GenerateState,
-  startTime: number
-) {
-  let pollCount = 0;
-  const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+type SetFn = (
+  partial:
+    | Partial<GenerateState>
+    | ((s: GenerateState) => Partial<GenerateState>),
+) => void;
+
+function startPolling(taskId: string, set: SetFn, get: () => GenerateState, startTime: number) {
+  if (polling.has(taskId)) return; // sudah ada loop berjalan
+  polling.add(taskId);
+
+  const finalize = (patch: Partial<ActiveTask>) => {
+    set((s) => {
+      const existing = s.tasks[taskId];
+      if (!existing) return {};
+      const updated: ActiveTask = { ...existing, ...patch };
+      const newTasks = { ...s.tasks, [taskId]: updated };
+      // Jika task yang baru selesai adalah task yang sedang di-fokuskan,
+      // refresh derived UI state supaya ResultSection menampilkan hasil.
+      const focusedTaskId = s.focusedTaskId || taskId;
+      return {
+        tasks: newTasks,
+        focusedTaskId,
+        ...deriveUiState(newTasks, focusedTaskId),
+      };
+    });
+  };
 
   const poll = async () => {
     const state = get();
-    // Stop if cleared or different task or already done
-    if (state.activeTaskId !== taskId || state.pollingStatus !== "polling") return;
-
-    // Timeout check
-    if (Date.now() - startTime > TIMEOUT_MS) {
-      set((s) => ({
-        pollingStatus: "failed",
-        logs: [...s.logs, { time: now(), level: "error", message: "✗ Generation timed out (30 mins). Please try again." }]
-      }));
+    const task = state.tasks[taskId];
+    if (!task || task.status !== "polling") {
+      polling.delete(taskId);
       return;
     }
 
-    pollCount++;
+    if (Date.now() - startTime > TASK_TIMEOUT_MS) {
+      finalize({ status: "failed" });
+      polling.delete(taskId);
+      set((s) => ({ logs: [...s.logs, { time: now(), level: "error", message: `✗ Task ${taskId.slice(0, 8)} timed out (30m).` }] }));
+      return;
+    }
+
     try {
       const res = await fetch(`/api/tasks/${taskId}/status`);
       if (!res.ok) {
         schedulePoll();
         return;
       }
-
       const json = await res.json();
-      const task = json.data;
-
-      if (task.status === "success") {
-        // Mark as completed even if resultUrl is null (edge case)
-        set({
-          pollingStatus: "completed",
-          resultVideoUrl: task.resultUrl || null,
-        });
+      const t = json.data;
+      if (t.status === "success") {
+        finalize({ status: "completed", resultUrl: t.resultUrl || null });
         get().triggerGalleryRefresh();
-        return; // stop polling
-      } else if (task.status === "failed") {
-        set({ pollingStatus: "failed" });
-        return; // stop polling
+        polling.delete(taskId);
+        return;
+      } else if (t.status === "failed") {
+        finalize({ status: "failed" });
+        polling.delete(taskId);
+        return;
       } else {
-        // Still processing
         schedulePoll();
       }
-    } catch (e: any) {
+    } catch (_e) {
       schedulePoll();
     }
   };
 
   const schedulePoll = () => {
-    setTimeout(poll, POLL_INTERVAL_MS);
+    // Jitter acak 30..90 detik antar poll. Motion control generate butuh 8–15
+    // menit, jadi interval ini cukup cepat untuk deteksi selesai namun tidak
+    // membuang bandwidth.
+    const range = POLL_MAX_INTERVAL_MS - POLL_MIN_INTERVAL_MS;
+    const delay = POLL_MIN_INTERVAL_MS + Math.floor(Math.random() * range);
+    setTimeout(poll, delay);
   };
 
-  // Initial poll after a short delay
-  setTimeout(poll, 3000);
+  // First poll: tunggu 5 menit setelah task dibuat. Video motion-control
+  // hampir tidak pernah selesai sebelum 5 menit, jadi polling lebih awal
+  // hanya buang-buang request.
+  const firstDelay = Math.max(
+    POLL_MIN_INTERVAL_MS,
+    POLL_FIRST_DELAY_MS - (Date.now() - startTime),
+  );
+  setTimeout(poll, firstDelay);
 }
