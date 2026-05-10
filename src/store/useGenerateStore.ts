@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { upload } from "@vercel/blob/client";
 
 // ─── Types ───────────────────────────────────────────────────────────
 export type StepStatus = "idle" | "running" | "success" | "error";
@@ -344,17 +345,14 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
         addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
 
         try {
-          const vRes = await fetch("/api/upload", {
-            method: "POST",
-            headers: { "x-vercel-blob-filename": videoFile.name },
-            body: videoFile,
+          // Client upload: browser → Vercel Blob langsung (bypass serverless
+          // 4.5 MB body limit). Token dibangkitkan oleh /api/upload.
+          const blob = await upload(videoFile.name, videoFile, {
+            access: "public",
+            handleUploadUrl: "/api/upload",
+            contentType: videoFile.type || "video/mp4",
           });
-          if (!vRes.ok) {
-            const errData = await vRes.json().catch(() => ({ error: `HTTP ${vRes.status}` }));
-            throw new Error(errData.error || `Upload failed (${vRes.status})`);
-          }
-          const vData = await vRes.json();
-          videoBlobUrl = vData.url;
+          videoBlobUrl = blob.url;
         } catch (uploadErr: any) {
           updateStep("upload_video", "error", uploadErr.message?.slice(0, 60));
           addLog("error", `✗ Video upload failed: ${uploadErr.message}`);
@@ -373,17 +371,12 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
       let imageBlobUrl: string;
       try {
-        const iRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "x-vercel-blob-filename": imageFile!.name },
-          body: imageFile!,
+        const blob = await upload(imageFile!.name, imageFile!, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+          contentType: imageFile!.type || "image/jpeg",
         });
-        if (!iRes.ok) {
-          const errData = await iRes.json().catch(() => ({ error: `HTTP ${iRes.status}` }));
-          throw new Error(errData.error || `Upload failed (${iRes.status})`);
-        }
-        const iData = await iRes.json();
-        imageBlobUrl = iData.url;
+        imageBlobUrl = blob.url;
       } catch (uploadErr: any) {
         updateStep("upload_image", "error", uploadErr.message?.slice(0, 60));
         addLog("error", `✗ Image upload failed: ${uploadErr.message}`);
