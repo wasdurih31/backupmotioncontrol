@@ -59,7 +59,7 @@ export default function LoadingOverlay({ isVisible }: LoadingOverlayProps) {
               }}
             >
               <img
-                src="https://xjiv5yqqnp7bldk3.public.blob.vercel-storage.com/sticker/STK-20260424-WA0011.webp"
+                src="https://i.ibb.co.com/Y7mcvnmp/STK-20260424-WA0011.webp"
                 alt="Loading Sticker"
                 style={{ width: 120, height: 120, objectFit: "contain" }}
               />
