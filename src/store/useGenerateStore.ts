@@ -46,6 +46,11 @@ export interface ActiveTask {
   };
 }
 
+// Batas ukuran file (video & image) — dienforce di frontend, store, dan
+// backend via `maximumSizeInBytes` di handleUpload.
+export const MAX_FILE_SIZE_MB = 6;
+export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 // Batas slot harus konsisten dengan server (`/api/generate`).
 export const MAX_CONCURRENT_TASKS = 5;
 
@@ -328,10 +333,16 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       if (videoFile) addLog("info", `Video: ${videoFile.name} (${(videoFile.size / 1048576).toFixed(1)} MB)`);
       if (imageFile) addLog("info", `Image: ${imageFile.name} (${(imageFile.size / 1048576).toFixed(1)} MB)`);
 
-      if (videoFile && videoFile.size > 500 * 1048576) {
-        updateStep("validate", "error", "Video exceeds 500 MB");
-        addLog("error", "✗ Video file exceeds 500 MB limit");
-        throw new Error("Video file is too large (max 500 MB)");
+      if (videoFile && videoFile.size > MAX_FILE_SIZE_BYTES) {
+        updateStep("validate", "error", `Video > ${MAX_FILE_SIZE_MB} MB`);
+        addLog("error", `✗ Video file melebihi batas ${MAX_FILE_SIZE_MB} MB`);
+        throw new Error(`Ukuran video terlalu besar (max ${MAX_FILE_SIZE_MB} MB)`);
+      }
+
+      if (imageFile && imageFile.size > MAX_FILE_SIZE_BYTES) {
+        updateStep("validate", "error", `Image > ${MAX_FILE_SIZE_MB} MB`);
+        addLog("error", `✗ Image file melebihi batas ${MAX_FILE_SIZE_MB} MB`);
+        throw new Error(`Ukuran gambar terlalu besar (max ${MAX_FILE_SIZE_MB} MB)`);
       }
 
       await new Promise((r) => setTimeout(r, 300));

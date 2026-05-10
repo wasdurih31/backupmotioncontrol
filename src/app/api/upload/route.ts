@@ -42,6 +42,9 @@ export async function POST(request: Request): Promise<NextResponse> {
               'video/mp4', 'video/webm', 'video/quicktime',
               'image/jpeg', 'image/png', 'image/webp'
             ],
+            // Hard-limit 6 MB per file. Dienforce Vercel Blob server-side,
+            // jadi walaupun frontend di-bypass tetap ditolak.
+            maximumSizeInBytes: 6 * 1024 * 1024,
           };
         },
         onUploadCompleted: async ({ blob }) => {

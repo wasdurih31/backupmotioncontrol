@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGenerateStore, MAX_CONCURRENT_TASKS, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
+import { useGenerateStore, MAX_CONCURRENT_TASKS, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, type PipelineStep, type LogEntry } from "@/store/useGenerateStore";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
 // Smart client-side download to save server bandwidth
@@ -382,7 +382,17 @@ function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }:
       <label className="text-xs font-medium leading-none flex items-center gap-1.5 text-muted-foreground">
         <Icon className="w-3.5 h-3.5" /> {isVideo ? "Ref" : "Char"} {label} <span className="text-red-500">*</span>
       </label>
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
+      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => {
+        const picked = e.target.files?.[0];
+        if (!picked) return;
+        if (picked.size > MAX_FILE_SIZE_BYTES) {
+          toast.error(`File ${label.toLowerCase()} terlalu besar (${(picked.size / 1048576).toFixed(1)} MB). Maksimum ${MAX_FILE_SIZE_MB} MB.`);
+          // reset value input agar user bisa pilih file yang sama lagi setelah gagal
+          e.target.value = "";
+          return;
+        }
+        setFile(picked);
+      }} />
       {file && previewUrl ? (
         <div className="relative rounded-xl overflow-hidden border border-border bg-black/40 group flex items-center justify-center h-40">
           {isVideo ? <video src={previewUrl} className="max-w-full max-h-full object-contain" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-lg" />}
@@ -399,6 +409,7 @@ function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }:
           <UploadCloud className="h-6 w-6 text-muted-foreground mb-2" />
           <p className="text-[10px] font-medium text-foreground">Upload {label}</p>
           <p className="text-[9px] text-muted-foreground mt-0.5">{formats}</p>
+          <p className="text-[9px] text-muted-foreground/70 mt-0.5">Max {MAX_FILE_SIZE_MB} MB</p>
         </div>
       )}
     </div>
