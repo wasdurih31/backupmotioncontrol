@@ -480,7 +480,10 @@ export default function GenerateVideoPage() {
     }
   }, [errors]);
 
-  const isGenerating = isSubmitting || pollingStatus === "polling";
+  // Upload zone hanya perlu di-disable saat benar-benar sedang submit file
+  // (upload/verify/create task). Saat ada task lain yang sedang "polling",
+  // user HARUS tetap bisa upload file untuk task baru selama slot tersedia.
+  const isGenerating = isSubmitting;
   // Hitung jumlah task yang sedang diproses (polling) untuk UI slot counter.
   const tasksMap = useGenerateStore((s) => s.tasks);
   const activeCount = useMemo(
