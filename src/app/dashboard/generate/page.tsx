@@ -370,6 +370,44 @@ interface UploadZoneProps {
   isGenerating: boolean;
 }
 
+// Batas durasi video referensi (detik). Freepik Kling motion-control mendukung
+// durasi hingga 30 detik, video lebih panjang akan langsung ditolak.
+const MAX_VIDEO_DURATION_SEC = 30;
+
+/** Baca durasi video di sisi browser via metadata HTMLVideoElement. */
+function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.src = url;
+    video.muted = true;
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
+    };
+    video.onloadedmetadata = () => {
+      const d = video.duration;
+      cleanup();
+      if (!Number.isFinite(d) || d <= 0) {
+        reject(new Error("Tidak dapat membaca durasi video"));
+      } else {
+        resolve(d);
+      }
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Gagal memuat metadata video"));
+    };
+    // Timeout 10 detik — file rusak atau codec tidak didukung browser.
+    setTimeout(() => {
+      cleanup();
+      reject(new Error("Timeout membaca durasi video"));
+    }, 10000);
+  });
+}
+
 function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }: UploadZoneProps) {
   const isVideo = type === "video";
   const accept = isVideo ? ".mp4,.mov,.webm,.m4v" : ".png,.jpg,.jpeg,.webp";
@@ -377,22 +415,47 @@ function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }:
   const formats = isVideo ? "MP4, MOV, WEBM" : "PNG, JPG, WEBP";
   const Icon = isVideo ? VideoIcon : ImageIcon;
 
+  const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    // Reset segera agar user bisa pilih file yang sama lagi setelah gagal.
+    const resetInput = () => { e.target.value = ""; };
+    if (!picked) return;
+
+    // 1. Cek ukuran.
+    if (picked.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File ${label.toLowerCase()} terlalu besar (${(picked.size / 1048576).toFixed(1)} MB). Maksimum ${MAX_FILE_SIZE_MB} MB.`);
+      resetInput();
+      return;
+    }
+
+    // 2. Cek durasi (hanya untuk video).
+    if (isVideo) {
+      const probeToastId = toast.loading("Memeriksa durasi video...");
+      try {
+        const duration = await getVideoDuration(picked);
+        toast.dismiss(probeToastId);
+        if (duration > MAX_VIDEO_DURATION_SEC) {
+          toast.error(`Durasi video ${duration.toFixed(1)}s melebihi batas. Maksimum ${MAX_VIDEO_DURATION_SEC} detik.`);
+          resetInput();
+          return;
+        }
+      } catch (err: any) {
+        toast.dismiss(probeToastId);
+        toast.error(`Tidak dapat memvalidasi durasi video: ${err.message || "unknown error"}`);
+        resetInput();
+        return;
+      }
+    }
+
+    setFile(picked);
+  };
+
   return (
     <div className="space-y-2">
       <label className="text-xs font-medium leading-none flex items-center gap-1.5 text-muted-foreground">
         <Icon className="w-3.5 h-3.5" /> {isVideo ? "Ref" : "Char"} {label} <span className="text-red-500">*</span>
       </label>
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => {
-        const picked = e.target.files?.[0];
-        if (!picked) return;
-        if (picked.size > MAX_FILE_SIZE_BYTES) {
-          toast.error(`File ${label.toLowerCase()} terlalu besar (${(picked.size / 1048576).toFixed(1)} MB). Maksimum ${MAX_FILE_SIZE_MB} MB.`);
-          // reset value input agar user bisa pilih file yang sama lagi setelah gagal
-          e.target.value = "";
-          return;
-        }
-        setFile(picked);
-      }} />
+      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={handlePick} />
       {file && previewUrl ? (
         <div className="relative rounded-xl overflow-hidden border border-border bg-black/40 group flex items-center justify-center h-40">
           {isVideo ? <video src={previewUrl} className="max-w-full max-h-full object-contain" controls muted playsInline /> : <img src={previewUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-lg" />}
@@ -409,7 +472,9 @@ function UploadZone({ type, file, previewUrl, setFile, inputRef, isGenerating }:
           <UploadCloud className="h-6 w-6 text-muted-foreground mb-2" />
           <p className="text-[10px] font-medium text-foreground">Upload {label}</p>
           <p className="text-[9px] text-muted-foreground mt-0.5">{formats}</p>
-          <p className="text-[9px] text-muted-foreground/70 mt-0.5">Max {MAX_FILE_SIZE_MB} MB</p>
+          <p className="text-[9px] text-muted-foreground/70 mt-0.5">
+            Max {MAX_FILE_SIZE_MB} MB{isVideo ? ` · ${MAX_VIDEO_DURATION_SEC}s` : ""}
+          </p>
         </div>
       )}
     </div>
