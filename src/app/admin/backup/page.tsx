@@ -103,17 +103,17 @@ export default function BackupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Download className="w-5 h-5 text-blue-500" />
-              Export Users
+              Export Database
             </CardTitle>
             <CardDescription>
-              Download all user data as a JSON file. User IDs are excluded to allow fresh ID generation upon restore.
+              Download semua data user (termasuk masa aktif subscription) dan tutorial sebagai file JSON.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-start gap-3">
               <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
               <div className="text-sm text-blue-200/80">
-                Data included: <span className="font-medium text-white">Email, Phone, Access Code, Role, Active Status, Subscription Dates</span>.
+                Data included: <span className="font-medium text-white">Semua data user (email, phone, access code, role, API key, subscription start/end, status aktif, total generate) + semua tutorial</span>.
               </div>
             </div>
             <Button 
@@ -132,17 +132,17 @@ export default function BackupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5 text-green-500" />
-              Restore / Import Users
+              Restore / Import
             </CardTitle>
             <CardDescription>
-              Upload a previously exported JSON file to migrate users into this database.
+              Upload file backup JSON untuk mengembalikan data user dan tutorial ke database ini.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
               <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-sm text-amber-200/80">
-                New unique IDs will be automatically generated. Users with an existing Email or Access Code in the current database will be <span className="font-bold text-white">skipped</span>.
+                User yang sudah ada (berdasarkan email/access code) akan <span className="font-bold text-white">diperbarui</span> datanya. Tutorial yang sudah ada (berdasarkan slug) juga diperbarui. Data baru akan ditambahkan.
               </div>
             </div>
             
