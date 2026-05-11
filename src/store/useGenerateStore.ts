@@ -116,11 +116,8 @@ const INITIAL_STEPS: PipelineStep[] = [
 const POLL_FIRST_DELAY_MS = 5 * 60 * 1000; // first poll: 5 menit setelah task dibuat
 const POLL_MIN_INTERVAL_MS = 30 * 1000;    // minimum 30s antar poll berikutnya
 const POLL_MAX_INTERVAL_MS = 90 * 1000;    // maximum 90s antar poll berikutnya
+const POLL_HIDDEN_INTERVAL_MS = 5 * 60 * 1000; // saat tab tidak aktif: cek tiap 5 menit saja
 const TASK_TIMEOUT_MS = 40 * 60 * 1000;   // 40 menit timeout (motion control 8–15m + margin)
-
-// Menyimpan task yang sedang aktif di-poll agar tidak dobel polling bila
-// `loadLatestTask` dipanggil berkali-kali.
-const polling = new Set<string>();
 
 // ─── Helper untuk turunkan UI-compat state dari tasks map ─────────────
 function deriveUiState(
@@ -506,18 +503,27 @@ type SetFn = (
     | ((s: GenerateState) => Partial<GenerateState>),
 ) => void;
 
-function startPolling(taskId: string, set: SetFn, get: () => GenerateState, startTime: number) {
-  if (polling.has(taskId)) return; // sudah ada loop berjalan
-  polling.add(taskId);
+/**
+ * Single batch poller untuk seluruh halaman. Dipanggil sekali saja, lalu
+ * self-schedule. Setiap tick:
+ *   1. Ambil semua task di state yang status-nya "polling" dan sudah
+ *      melewati POLL_FIRST_DELAY_MS.
+ *   2. Panggil /api/tasks/status?ids=... (1 request untuk semua task).
+ *   3. Update state berdasarkan response.
+ *   4. Schedule tick berikutnya dengan jitter. Kalau tab hidden → 5 menit.
+ */
+let batchPollerStarted = false;
 
-  const finalize = (patch: Partial<ActiveTask>) => {
+function ensureBatchPoller(set: SetFn, get: () => GenerateState) {
+  if (batchPollerStarted) return;
+  batchPollerStarted = true;
+
+  const finalize = (taskId: string, patch: Partial<ActiveTask>) => {
     set((s) => {
       const existing = s.tasks[taskId];
       if (!existing) return {};
       const updated: ActiveTask = { ...existing, ...patch };
       const newTasks = { ...s.tasks, [taskId]: updated };
-      // Jika task yang baru selesai adalah task yang sedang di-fokuskan,
-      // refresh derived UI state supaya ResultSection menampilkan hasil.
       const focusedTaskId = s.focusedTaskId || taskId;
       return {
         tasks: newTasks,
@@ -527,61 +533,99 @@ function startPolling(taskId: string, set: SetFn, get: () => GenerateState, star
     });
   };
 
-  const poll = async () => {
+  const tick = async () => {
     const state = get();
-    const task = state.tasks[taskId];
-    if (!task || task.status !== "polling") {
-      polling.delete(taskId);
-      return;
+    const now = Date.now();
+
+    // Kumpulkan task yang layak di-poll:
+    //  - status "polling"
+    //  - sudah lewat waktu firstPoll (5 menit setelah mulai)
+    //  - belum timeout (40 menit)
+    const pollable: ActiveTask[] = [];
+    const timedOut: string[] = [];
+    for (const t of Object.values(state.tasks)) {
+      if (t.status !== "polling") continue;
+      const elapsed = now - t.startedAt;
+      if (elapsed > TASK_TIMEOUT_MS) {
+        timedOut.push(t.taskId);
+        continue;
+      }
+      if (elapsed < POLL_FIRST_DELAY_MS) continue;
+      pollable.push(t);
     }
 
-    if (Date.now() - startTime > TASK_TIMEOUT_MS) {
-      finalize({ status: "failed" });
-      polling.delete(taskId);
-      set((s) => ({ logs: [...s.logs, { time: now(), level: "error", message: `✗ Task ${taskId.slice(0, 8)} timed out (30m).` }] }));
+    // Tandai yang timeout.
+    for (const id of timedOut) {
+      finalize(id, { status: "failed" });
+    }
+
+    // Kalau tidak ada yang perlu dipoll, schedule ulang saja.
+    if (pollable.length === 0) {
+      schedule();
       return;
     }
 
     try {
-      const res = await fetch(`/api/tasks/${taskId}/status`);
-      if (!res.ok) {
-        schedulePoll();
-        return;
-      }
-      const json = await res.json();
-      const t = json.data;
-      if (t.status === "success") {
-        finalize({ status: "completed", resultUrl: t.resultUrl || null });
-        get().triggerGalleryRefresh();
-        polling.delete(taskId);
-        return;
-      } else if (t.status === "failed") {
-        finalize({ status: "failed" });
-        polling.delete(taskId);
-        return;
-      } else {
-        schedulePoll();
+      const ids = pollable.map((t) => t.taskId).join(",");
+      const res = await fetch(`/api/tasks/status?ids=${encodeURIComponent(ids)}`);
+      if (res.ok) {
+        const json = await res.json();
+        const results: Array<{ id: string; status: string; resultUrl: string | null }> = json.data || [];
+        for (const r of results) {
+          if (r.status === "success") {
+            finalize(r.id, { status: "completed", resultUrl: r.resultUrl || null });
+            get().triggerGalleryRefresh();
+          } else if (r.status === "failed" || r.status === "expired") {
+            finalize(r.id, { status: "failed" });
+          }
+          // "processing"/"queued" → biarkan.
+        }
       }
     } catch (_e) {
-      schedulePoll();
+      // abaikan — coba lagi di tick berikutnya.
     }
+
+    schedule();
   };
 
-  const schedulePoll = () => {
-    // Jitter acak 30..90 detik antar poll. Motion control generate butuh 8–15
-    // menit, jadi interval ini cukup cepat untuk deteksi selesai namun tidak
-    // membuang bandwidth.
-    const range = POLL_MAX_INTERVAL_MS - POLL_MIN_INTERVAL_MS;
-    const delay = POLL_MIN_INTERVAL_MS + Math.floor(Math.random() * range);
-    setTimeout(poll, delay);
+  const schedule = () => {
+    // Kalau tidak ada task aktif, schedule dengan interval lebih panjang
+    // (low-frequency idle poll) untuk antisipasi task baru di-submit.
+    const hasActive = Object.values(get().tasks).some((t) => t.status === "polling");
+    const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+
+    let delay: number;
+    if (!hasActive) {
+      delay = POLL_MAX_INTERVAL_MS; // tidak ada yang dipoll, santai
+    } else if (hidden) {
+      delay = POLL_HIDDEN_INTERVAL_MS;
+    } else {
+      const range = POLL_MAX_INTERVAL_MS - POLL_MIN_INTERVAL_MS;
+      delay = POLL_MIN_INTERVAL_MS + Math.floor(Math.random() * range);
+    }
+    setTimeout(tick, delay);
   };
 
-  // First poll: tunggu 5 menit setelah task dibuat. Video motion-control
-  // hampir tidak pernah selesai sebelum 5 menit, jadi polling lebih awal
-  // hanya buang-buang request.
-  const firstDelay = Math.max(
-    POLL_MIN_INTERVAL_MS,
-    POLL_FIRST_DELAY_MS - (Date.now() - startTime),
-  );
-  setTimeout(poll, firstDelay);
+  // Saat tab kembali visible, tick lebih cepat agar UI update segera.
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        setTimeout(tick, 1000);
+      }
+    });
+  }
+
+  // First tick setelah 3 detik.
+  setTimeout(tick, 3000);
+}
+
+// API lama: dipanggil saat runGeneration / loadLatestTask.
+// Sekarang cuma memastikan batch poller jalan.
+function startPolling(
+  _taskId: string,
+  set: SetFn,
+  get: () => GenerateState,
+  _startTime: number,
+) {
+  ensureBatchPoller(set, get);
 }
