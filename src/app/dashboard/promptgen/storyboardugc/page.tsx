@@ -76,10 +76,103 @@ function computeChunks(total: number): Array<{ start: number; end: number }> {
   return chunks;
 }
 
+/**
+ * Parse AI output menjadi sections terpisah: Storyboard Prompt, Video Prompt, JSON.
+ * AI output format: ## Prompt Part N → ### Storyboard Prompt → ### Video Prompt → ### JSON
+ */
+function parseResult(raw: string): { storyboard: string; video: string; json: string } {
+  // Coba split berdasarkan heading markdown
+  const storyboardParts: string[] = [];
+  const videoParts: string[] = [];
+  const jsonParts: string[] = [];
+
+  // Regex untuk menangkap section
+  const storyboardRegex = /###?\s*Storyboard Prompt\s*\n([\s\S]*?)(?=###?\s*Video Prompt|###?\s*JSON|##\s*Prompt Part|$)/gi;
+  const videoRegex = /###?\s*Video Prompt\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*Storyboard|##\s*Prompt Part|$)/gi;
+  const jsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*Storyboard|###?\s*Video|##\s*Prompt Part|$)/gi;
+
+  let match;
+  while ((match = storyboardRegex.exec(raw)) !== null) storyboardParts.push(match[1].trim());
+  while ((match = videoRegex.exec(raw)) !== null) videoParts.push(match[1].trim());
+  while ((match = jsonRegex.exec(raw)) !== null) jsonParts.push(match[1].trim());
+
+  return {
+    storyboard: storyboardParts.length > 0 ? storyboardParts.join("\n\n---\n\n") : raw,
+    video: videoParts.length > 0 ? videoParts.join("\n\n---\n\n") : "",
+    json: jsonParts.length > 0 ? jsonParts.join("\n\n") : "",
+  };
+}
+
+function ResultTabs({ result }: { result: string }) {
+  const [activeTab, setActiveTab] = useState<"storyboard" | "video" | "json">("storyboard");
+  const [copiedTab, setCopiedTab] = useState(false);
+
+  const parsed = parseResult(result);
+
+  const tabs = [
+    { id: "storyboard" as const, label: "🖼️ Image Prompt", content: parsed.storyboard },
+    { id: "video" as const, label: "🎬 Video Prompt", content: parsed.video },
+    { id: "json" as const, label: "{ } JSON", content: parsed.json },
+  ];
+
+  const currentContent = tabs.find((t) => t.id === activeTab)?.content || result;
+
+  const handleCopyTab = () => {
+    navigator.clipboard.writeText(currentContent);
+    setCopiedTab(true);
+    toast.success(`${activeTab === "storyboard" ? "Image" : activeTab === "video" ? "Video" : "JSON"} prompt copied!`);
+    setTimeout(() => setCopiedTab(false), 2000);
+  };
+
+  return (
+    <Card className="bg-card/30 border-green-500/20">
+      <CardHeader className="pb-0">
+        <div className="flex items-center justify-between mb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            Hasil Generate
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={handleCopyTab} className="gap-1.5 text-xs">
+            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedTab ? "Copied!" : "Copy"}
+          </Button>
+        </div>
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-border/30 -mx-6 px-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="bg-black/40 rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+          {currentContent ? (
+            <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{currentContent}</pre>
+          ) : (
+            <p className="text-xs text-muted-foreground italic text-center py-8">
+              Section ini tidak ditemukan dalam output AI. Coba generate ulang.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function StoryboardUGCPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -199,15 +292,6 @@ Generate ALL ${totalParts} prompt part(s). Each part MUST be under 2000 characte
       setIsGenerating(false);
     }
   }
-
-  const handleCopy = () => {
-    if (result) {
-      navigator.clipboard.writeText(result);
-      setCopied(true);
-      toast.success("Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   // Preview chunking info
   const watchedSceneCount = parseInt(form.watch("sceneCount") || "6");
@@ -418,25 +502,7 @@ Generate ALL ${totalParts} prompt part(s). Each part MUST be under 2000 characte
             </Card>
           )}
 
-          {result && (
-            <Card className="bg-card/30 border-green-500/20">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  Hasil Generate
-                </CardTitle>
-                <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">
-                  {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copied!" : "Copy All"}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-black/40 rounded-xl p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{result}</pre>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {result && <ResultTabs result={result} />}
         </div>
       </div>
     </div>

@@ -56,7 +56,6 @@ type FormValues = z.infer<typeof schema>;
 export default function UGCAffiliatePageComponent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -159,15 +158,6 @@ Generate all outputs.`;
       setIsGenerating(false);
     }
   }
-
-  const handleCopy = () => {
-    if (result) {
-      navigator.clipboard.writeText(result);
-      setCopied(true);
-      toast.success("Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
@@ -368,27 +358,99 @@ Generate all outputs.`;
             </Card>
           )}
 
-          {result && (
-            <Card className="bg-card/30 border-green-500/20">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  Hasil Generate
-                </CardTitle>
-                <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5 text-xs">
-                  {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copied!" : "Copy All"}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-black/40 rounded-xl p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{result}</pre>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {result && <UGCResultTabs result={result} />}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Parse UGC output: Image Variants (1-4), Video Prompt, JSON.
+ */
+function parseUGCResult(raw: string): { images: string; video: string; json: string } {
+  const imageParts: string[] = [];
+  const videoParts: string[] = [];
+  const jsonParts: string[] = [];
+
+  const imageRegex = /###?\s*IMAGE PROMPT VARIANT\s*\d+\s*\n([\s\S]*?)(?=###?\s*IMAGE PROMPT VARIANT|###?\s*VIDEO PROMPT|###?\s*JSON|$)/gi;
+  const videoRegex = /###?\s*VIDEO PROMPT\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*IMAGE|$)/gi;
+  const jsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
+
+  let match;
+  while ((match = imageRegex.exec(raw)) !== null) imageParts.push(match[1].trim());
+  while ((match = videoRegex.exec(raw)) !== null) videoParts.push(match[1].trim());
+  while ((match = jsonRegex.exec(raw)) !== null) jsonParts.push(match[1].trim());
+
+  return {
+    images: imageParts.length > 0 ? imageParts.map((p, i) => `── Variant ${i + 1} ──\n${p}`).join("\n\n") : raw,
+    video: videoParts.length > 0 ? videoParts.join("\n\n") : "",
+    json: jsonParts.length > 0 ? jsonParts.join("\n\n") : "",
+  };
+}
+
+function UGCResultTabs({ result }: { result: string }) {
+  const [activeTab, setActiveTab] = useState<"images" | "video" | "json">("images");
+  const [copiedTab, setCopiedTab] = useState(false);
+
+  const parsed = parseUGCResult(result);
+
+  const tabs = [
+    { id: "images" as const, label: "🖼️ Image Prompts (4)", content: parsed.images },
+    { id: "video" as const, label: "🎬 Video Prompt", content: parsed.video },
+    { id: "json" as const, label: "{ } JSON", content: parsed.json },
+  ];
+
+  const currentContent = tabs.find((t) => t.id === activeTab)?.content || result;
+
+  const handleCopyTab = () => {
+    navigator.clipboard.writeText(currentContent);
+    setCopiedTab(true);
+    toast.success("Copied!");
+    setTimeout(() => setCopiedTab(false), 2000);
+  };
+
+  return (
+    <Card className="bg-card/30 border-green-500/20">
+      <CardHeader className="pb-0">
+        <div className="flex items-center justify-between mb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            Hasil Generate
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={handleCopyTab} className="gap-1.5 text-xs">
+            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedTab ? "Copied!" : "Copy"}
+          </Button>
+        </div>
+        <div className="flex gap-1 border-b border-border/30 -mx-6 px-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? "border-green-500 text-green-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="bg-black/40 rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+          {currentContent ? (
+            <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{currentContent}</pre>
+          ) : (
+            <p className="text-xs text-muted-foreground italic text-center py-8">
+              Section ini tidak ditemukan. Coba generate ulang.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
