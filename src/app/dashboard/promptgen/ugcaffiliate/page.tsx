@@ -87,73 +87,78 @@ export default function UGCAffiliatePageComponent() {
       : "cinematic depth of field, professional lighting response";
     const env = values.customEnvironment?.trim() || values.environment;
 
-    const systemPrompt = `You are a professional storyboard artist specialized in UGC-style visual storytelling for TikTok/Shopee affiliate content.
+    const systemPrompt = `You are a professional storyboard artist specialized in creating UGC affiliate IMAGE VARIATIONS for TikTok/Shopee.
 
-CORE STYLE: Natural storyboard prompting.
-Write like a human creative director, NOT a screenplay.
+YOUR TASK:
+- Generate 4 IMAGE GENERATION PROMPTS (each one instructs an AI image model to CREATE an image, NOT describe one).
+- Each variant is independent — a standalone image of the same model + product in different pose/angle/expression.
+- These prompts will be used for i2i with character + product reference images.
 
-CRITICAL DO NOT USE (trigger AI image models to render text overlay / infographic layouts):
-- Labels: CHARACTER LOCK, PRODUCT LOCK, REFERENCE LOCK, GLOBAL STYLE
-- Screenplay terms: Hook, Problem, Solution, CTA, Goal, Reaction, Result
-- Metadata blocks: Camera Angle:, Character Action:, Product Interaction:, Duration:
+CRITICAL — EACH IMAGE PROMPT MUST START WITH COMMAND:
+Each Image Prompt Variant MUST begin with explicit image-generation command. Example:
+- "Buatlah foto UGC..." 
+- "Create a UGC photo of..."
+- "Generate a realistic lifestyle photo of..."
 
-USE INSTEAD — Natural scene descriptions. Each variant:
-- 1 short sentence, 15-30 words max
-- Visual, direct, feels like photo direction
-- Subject + action + camera style + lighting
+DO NOT start with "Ini menunjukkan..." or "Foto ini menggambarkan..." (those describe images, not create them).
 
 PRODUCT RULE (CRITICAL):
-- DO NOT describe product packaging (no "frosted jar", "white cap", "pink label")
-- Use: "produk sesuai gambar referensi" / "produk dari gambar referensi"
+- DO NOT describe product packaging (NO "frosted jar", "white cap", "pink label")
+- ALWAYS use: "produk sesuai gambar referensi" / "produk dari gambar referensi"
 
 CHARACTER RULE:
-- DO NOT use "CHARACTER LOCK:" label
-- Naturally write: "model yang sama", "wanita yang sama" across all 4 variants
+- Naturally repeat: "model yang sama", "wanita yang sama" across all 4 variants
+- NEVER use "CHARACTER LOCK:" label
 
 LOCKED across 4 variants: same model, same product (gambar referensi), same visual style, same environment
 VARIABLE across variants: pose, camera angle, expression, product interaction, framing
+
+DO NOT USE: screenplay labels (Hook, CTA, Goal, Solution), metadata blocks (GLOBAL STYLE:, CHARACTER LOCK:, etc.)
 
 Camera style: ${cameraStyle}
 Environment: ${env}
 
 OUTPUT FORMAT (markdown):
+
 ### IMAGE PROMPT VARIANT 1
-[1 natural sentence, 15-30 words]
+[Command sentence + 1 natural sentence describing pose/action/lighting — 15-30 words total]
 Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### IMAGE PROMPT VARIANT 2
-[1 natural sentence, different pose/angle]
+[Command sentence + different pose/angle, 15-30 words]
 Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### IMAGE PROMPT VARIANT 3
-[1 natural sentence]
+[Command sentence + different pose/angle, 15-30 words]
 Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### IMAGE PROMPT VARIANT 4
-[1 natural sentence]
+[Command sentence + different pose/angle, 15-30 words]
 Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### VIDEO PROMPT
-[1 short natural paragraph for ${values.duration}s video, no labels]
+[1 short natural paragraph describing the ${values.duration}s video motion — no labels, no screenplay terms]
 
 ### JSON
 { "variants": [...], "video_prompt": "...", "negative_prompt": "..." }`;
 
-    const userPrompt = `Generate 4 image variations + 1 video prompt for affiliate UGC.
+    const userPrompt = `Generate 4 UGC affiliate image variants + 1 video prompt.
+
+CRITICAL: Each Image Prompt Variant MUST start with a command to CREATE an image ("Buatlah foto UGC...", "Create a UGC photo of..."), NOT a description.
 
 Product name: ${values.productName}
 Category: ${values.productCategory}
-Content vibe: ${values.contentStyle.toLowerCase()} (natural, NOT labeled)
+Content vibe: ${values.contentStyle.toLowerCase()} (natural, not labeled)
 Environment: ${env}
 Camera: ${values.cameraDevice}
 Video duration: ${values.duration}s
 Video model target: ${values.videoModel}
 ${values.characterDesc ? `Character: ${values.characterDesc}` : ""}
 ${values.productDesc ? `Product notes (context only, do NOT describe packaging): ${values.productDesc}` : ""}
-${values.scriptMode === "manual" && values.manualScript ? `Manual voiceover: "${values.manualScript}"` : "Dialogue: natural, 1 short line"}
+${values.scriptMode === "manual" && values.manualScript ? `Manual voiceover (for Video Prompt only): "${values.manualScript}"` : "Dialogue: natural, 1 short line"}
 
 Write in Bahasa Indonesia (natural creator style).
-Generate all 4 image variants + video prompt + JSON following the exact output format.`;
+Generate all 4 image variants (each starting with a creation command) + video prompt + JSON in the exact format above.`;
 
     try {
       const res = await fetch("/api/promptgen", {

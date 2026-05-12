@@ -214,86 +214,99 @@ export default function StoryboardUGCPage() {
     const totalParts = chunks.length;
     const chunkInfo = chunks.map((c, i) => `Part ${i + 1}: Scene ${c.start}-${c.end}`).join(", ");
 
-    const systemPrompt = `You are a professional storyboard artist specialized in commercial and UGC-style visual storytelling for TikTok/Shopee affiliate content.
+    const systemPrompt = `You are a professional storyboard artist specialized in creating STORYBOARD IMAGES for UGC TikTok affiliate content.
 
-CORE STYLE: Natural storyboard prompting.
-Write like a human creative director, NOT a screenplay.
+YOUR TASK:
+- Create an IMAGE GENERATION PROMPT that instructs an AI image model (GPT Image 2, Nano Banana, Midjourney, i2i models) to produce a storyboard sheet image.
+- NOT a video description. NOT a video script.
+- The output is a prompt that creates a visual storyboard artifact (panel sheet) that the user can then use as reference for video generation.
 
-CRITICAL DO NOT USE (these trigger AI image models to render text overlay / infographic layouts):
-- Labels like: GLOBAL STYLE, CHARACTER LOCK, PRODUCT LOCK, REFERENCE LOCK, CONTINUATION CONTEXT
-- Screenplay terms: Hook, Problem, Solution, CTA, Goal, Result, Reaction
-- Metadata blocks: Camera Angle:, Character Action:, Product Interaction:, Duration:
-- Long cinematic paragraphs / production notes
+CRITICAL — STORYBOARD PROMPT MUST START WITH COMMAND SENTENCE:
+The Image Prompt MUST begin with explicit image-generation command. Example:
+- "Buatlah gambar storyboard UGC 6 adegan dengan layout grid 2x3 yang menampilkan..."
+- "Create a 6-panel UGC storyboard sheet (2x3 grid) showing..."
+- "Generate a storyboard image with N panels depicting..."
 
-USE INSTEAD — Natural scene descriptions. Each scene:
-- 1 short sentence, 10-25 words max
+DO NOT start with:
+- "Video ini menunjukkan..."
+- "This video shows..."
+- "Video ini menggambarkan..."
+(These describe a video — they are for the Video Prompt section, NOT the Image Prompt)
+
+LAYOUT FORMULA for storyboard image:
+- 3 scenes → 1x3 horizontal strip OR 3x1 vertical
+- 4 scenes → 2x2 grid
+- 5-6 scenes → 2x3 grid
+- 7-8 scenes (per part) → distribute across parts
+
+PROMPT STYLE:
+- Natural scene descriptions inside each panel
+- Each scene: 1 short sentence (10-25 words)
+- "Scene 1: ..." / "Panel 1: ..." format
 - Visual, direct, feels like storyboard direction
-- Include: subject + action + camera style + lighting (+ product interaction if relevant)
 
-OUTPUT STRUCTURE per part:
-1. One intro sentence describing the video
-2. One line about visual style (camera, lighting, aesthetic)
-3. Scene list: "Scene 1: ...", "Scene 2: ..." (numbers only, NO screenplay labels after scene number)
-4. Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
+CRITICAL DO NOT USE (trigger AI to render text overlay / infographic layouts):
+- Screenplay labels: Hook, Problem, Solution, CTA, Goal, Reaction, Result
+- Metadata blocks: GLOBAL STYLE:, CHARACTER LOCK:, PRODUCT LOCK:, Camera Angle:, etc.
+- Screenplay formatting
+
+PRODUCT CONSISTENCY (CRITICAL):
+- DO NOT describe product packaging (NO "frosted jar", "white cap", "pink label")
+- ALWAYS use: "produk sesuai gambar referensi" atau "produk dari gambar referensi"
+- This prevents hallucinated packaging and ensures i2i reference is respected
+
+CHARACTER CONSISTENCY:
+- Naturally repeat: "model yang sama", "wanita yang sama", "karakter yang sama" in each scene
+- NEVER use "CHARACTER LOCK:" label
 
 SCENE CHUNKING:
 - Total scenes: ${sceneCount}
 - Split into ${totalParts} part(s): ${chunkInfo}
-- Each part stays under 2000 chars (preferred 1200-1800)
+- Each part stays under 2000 chars
 ${totalParts > 1 ? `
 MULTI-PART CONTINUATION:
-- Every part MUST feel like direct continuation of the previous
-- Natural continuity (NOT "CONTINUATION CONTEXT:" label): start with "Melanjutkan dari storyboard sebelumnya, model yang sama..." or similar natural phrasing
-- Same model, same product (reference produk sesuai gambar referensi), same environment, same mood
-- DO NOT restart story. DO NOT describe everything from scratch again.
+- Start subsequent parts with: "Lanjutan storyboard sebelumnya dengan model yang sama dan produk dari gambar referensi yang sama..."
+- Maintain same visual style, same environment, same mood
+- DO NOT restart from scratch
 ` : ""}
-PRODUCT RULE (CRITICAL):
-- DO NOT describe product packaging details (no "frosted glass jar", "white cap", "pink label")
-- Just say: "produk sesuai gambar referensi" or "produk dari gambar referensi"
-
-CHARACTER RULE:
-- DO NOT use "CHARACTER LOCK:" label
-- Naturally write: "model yang sama", "wanita yang sama", "karakter yang sama" across scenes
-
 CAMERA STYLE for this project: ${cameraStyle}
 ENVIRONMENT: ${env}
 
-VIDEO PROMPT format:
-- 1 short paragraph describing the full video motion/pacing for this part
-- No labels, no screenplay terms, just natural video direction
-- Duration-aware
-
 OUTPUT FORMAT (markdown, for EACH part):
+
 ## Prompt Part [N]
+
 ### Storyboard Prompt
-[intro sentence]
-[visual style sentence]
-Scene 1: ...
-Scene 2: ...
+[Command sentence: "Buatlah gambar storyboard UGC [X] adegan dalam layout grid [YxZ]..."]
+[Visual style: 1 line — camera, lighting, aesthetic]
+Scene 1: [model yang sama + action + camera + lighting]
+Scene 2: [model yang sama + action + camera + lighting]
 ...
 Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### Video Prompt
-[1 short natural paragraph describing video motion, under 2000 chars]
+[1 short natural paragraph describing the video motion/pacing, no labels, duration-aware, under 2000 chars]
 
 ### JSON
-{ "part": N, "scenes": [...], "negative_prompt": "..." }`;
+{ "part": N, "layout": "2x3", "scenes": [...], "negative_prompt": "..." }`;
 
     const userPrompt = `Generate a ${sceneCount}-scene UGC storyboard for a ${duration}s TikTok affiliate video.
 Split into ${totalParts} part(s): ${chunkInfo}
 
+CRITICAL: The "Storyboard Prompt" section MUST start with a command to create a storyboard IMAGE (e.g. "Buatlah gambar storyboard UGC..."), NOT a video description.
+
 Product name: ${values.productName}
 Category: ${values.productCategory}
-Content vibe: ${values.contentStyle.toLowerCase()} (natural, NOT labeled)
+Content vibe: ${values.contentStyle.toLowerCase()} (natural, not labeled)
 Environment: ${env}
 Camera: ${values.cameraDevice}
 Video model target: ${values.videoModel}
 ${values.characterDesc ? `Character: ${values.characterDesc}` : ""}
 ${values.productDesc ? `Product notes (context only, do NOT describe packaging): ${values.productDesc}` : ""}
-${values.scriptMode === "manual" && values.manualScript ? `Manual script voiceover: "${values.manualScript}"` : "Dialogue: natural, affiliate-friendly, 1-2 short lines"}
+${values.scriptMode === "manual" && values.manualScript ? `Manual voiceover (for Video Prompt only): "${values.manualScript}"` : "Dialogue: natural, affiliate-friendly, 1-2 short lines"}
 
-Write in Bahasa Indonesia (natural, like a real content creator briefing).
-Generate ALL ${totalParts} part(s) following the exact output format.${totalParts > 1 ? " Each subsequent part must continue naturally from the previous — same model, same product, same vibe." : ""}`;
+Write in Bahasa Indonesia (natural creator style).
+Generate ALL ${totalParts} part(s) exactly in the specified output format.${totalParts > 1 ? " Subsequent parts start with 'Lanjutan storyboard sebelumnya...' phrasing." : ""}`;
 
     try {
       const res = await fetch("/api/promptgen", {
