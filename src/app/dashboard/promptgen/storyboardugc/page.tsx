@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
 const MODEL_OPTIONS = [
+  { value: "openrouter|auto-free", label: "Auto Free (OpenRouter)", provider: "openrouter", model: "auto-free" },
   { value: "openrouter|gemma-4-26b", label: "Gemma 4 26B (Free)", provider: "openrouter", model: "gemma-4-26b" },
   { value: "groq|llama-4-scout", label: "Llama 4 Scout (Free)", provider: "groq", model: "llama-4-scout" },
   { value: "groq|llama-4-maverick", label: "Llama 4 Maverick (Free)", provider: "groq", model: "llama-4-maverick" },
@@ -64,7 +65,7 @@ export default function StoryboardUGCPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       provider: "openrouter",
-      model: "gemma-4-26b",
+      model: "auto-free",
       productName: "",
       productCategory: "beauty",
       contentStyle: "Problem Solution",

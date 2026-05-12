@@ -11,6 +11,7 @@ const PROVIDERS = {
   openrouter: {
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
     models: {
+      'auto-free': 'openrouter/free',
       'gemma-4-26b': 'google/gemma-4-26b-a4b-it:free',
     },
   },
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
     }
 
     const selectedProvider = provider || 'openrouter';
-    const selectedModel = model || 'gemma-4-26b';
+    const selectedModel = model || 'auto-free';
 
     let result: string;
 
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
 
       result = await callGemini(apiKey, modelId, systemPrompt || '', userPrompt);
     } else if (selectedProvider === 'openrouter') {
-      const modelId = (PROVIDERS.openrouter.models as any)[selectedModel] || 'google/gemma-4-26b-a4b-it:free';
+      const modelId = (PROVIDERS.openrouter.models as any)[selectedModel] || 'openrouter/free';
       const endpoint = PROVIDERS.openrouter.endpoint;
 
       result = await callWithFailover('openrouter', (apiKey) =>
