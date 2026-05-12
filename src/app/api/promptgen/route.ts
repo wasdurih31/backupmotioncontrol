@@ -5,6 +5,7 @@ import { userAiSettings } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 import { callWithFailover } from '@/lib/keySelector';
+import { normalizePrompt } from '@/lib/promptNormalizer';
 
 // Provider configs
 const PROVIDERS = {
@@ -155,7 +156,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Provider tidak valid.' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, result });
+    return NextResponse.json({ success: true, result: normalizePrompt(result) });
   } catch (error: any) {
     console.error('Promptgen Error:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

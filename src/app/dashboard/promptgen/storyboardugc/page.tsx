@@ -214,62 +214,86 @@ export default function StoryboardUGCPage() {
     const totalParts = chunks.length;
     const chunkInfo = chunks.map((c, i) => `Part ${i + 1}: Scene ${c.start}-${c.end}`).join(", ");
 
-    const systemPrompt = `You are an expert AI prompt generator specialized in TikTok affiliate UGC storyboards.
+    const systemPrompt = `You are a professional storyboard artist specialized in commercial and UGC-style visual storytelling for TikTok/Shopee affiliate content.
 
-CRITICAL RULES:
-- Each prompt part MUST stay under 2000 characters (preferred: 1200-1800 chars)
-- Use short descriptive phrases, NOT long cinematic paragraphs
-- Each scene: scene number, goal, camera angle, character action, product interaction, environment, motion, duration
-- Camera style: ${cameraStyle}
-- Environment: ${env}
+CORE STYLE: Natural storyboard prompting.
+Write like a human creative director, NOT a screenplay.
+
+CRITICAL DO NOT USE (these trigger AI image models to render text overlay / infographic layouts):
+- Labels like: GLOBAL STYLE, CHARACTER LOCK, PRODUCT LOCK, REFERENCE LOCK, CONTINUATION CONTEXT
+- Screenplay terms: Hook, Problem, Solution, CTA, Goal, Result, Reaction
+- Metadata blocks: Camera Angle:, Character Action:, Product Interaction:, Duration:
+- Long cinematic paragraphs / production notes
+
+USE INSTEAD — Natural scene descriptions. Each scene:
+- 1 short sentence, 10-25 words max
+- Visual, direct, feels like storyboard direction
+- Include: subject + action + camera style + lighting (+ product interaction if relevant)
+
+OUTPUT STRUCTURE per part:
+1. One intro sentence describing the video
+2. One line about visual style (camera, lighting, aesthetic)
+3. Scene list: "Scene 1: ...", "Scene 2: ..." (numbers only, NO screenplay labels after scene number)
+4. Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 SCENE CHUNKING:
 - Total scenes: ${sceneCount}
-- Split into ${totalParts} prompt part(s): ${chunkInfo}
+- Split into ${totalParts} part(s): ${chunkInfo}
+- Each part stays under 2000 chars (preferred 1200-1800)
 ${totalParts > 1 ? `
-CONTINUATION RULES (CRITICAL for multi-part):
-- Every part MUST continue from previous part seamlessly
-- Maintain: same character, same product, same environment, same emotional progression, same visual style, same camera style
-- Each new part starts with continuation context: "continuation of previous storyboard, same [character], same [product], same [environment], same visual style"
-- DO NOT restart story in new part
-- BAD: Part 2 feels like completely different video
-- GOOD: Part 2 feels like direct continuation from Part 1
+MULTI-PART CONTINUATION:
+- Every part MUST feel like direct continuation of the previous
+- Natural continuity (NOT "CONTINUATION CONTEXT:" label): start with "Melanjutkan dari storyboard sebelumnya, model yang sama..." or similar natural phrasing
+- Same model, same product (reference produk sesuai gambar referensi), same environment, same mood
+- DO NOT restart story. DO NOT describe everything from scratch again.
 ` : ""}
-PROMPT STRUCTURE (per part):
-1. GLOBAL STYLE (camera, lighting, mood — 1 line)
-2. REFERENCE LOCK (character + product lock)
-${totalParts > 1 ? "3. CONTINUATION CONTEXT\n4. SCENE LIST\n5. NEGATIVE PROMPT" : "3. SCENE LIST\n4. NEGATIVE PROMPT"}
+PRODUCT RULE (CRITICAL):
+- DO NOT describe product packaging details (no "frosted glass jar", "white cap", "pink label")
+- Just say: "produk sesuai gambar referensi" or "produk dari gambar referensi"
 
-CHARACTER LOCK: "Use the exact same person from reference image. Maintain identical facial features and appearance."
-PRODUCT LOCK: "Use the exact same product from reference image. Maintain identical packaging and label design."
+CHARACTER RULE:
+- DO NOT use "CHARACTER LOCK:" label
+- Naturally write: "model yang sama", "wanita yang sama", "karakter yang sama" across scenes
 
-AFFILIATE PACING:
-- 5-8s: Hook > Problem > Solution > CTA
-- 10-15s: Hook > Problem > Reaction > Solution > Result > CTA
+CAMERA STYLE for this project: ${cameraStyle}
+ENVIRONMENT: ${env}
 
-OUTPUT FORMAT (for EACH part separately):
+VIDEO PROMPT format:
+- 1 short paragraph describing the full video motion/pacing for this part
+- No labels, no screenplay terms, just natural video direction
+- Duration-aware
+
+OUTPUT FORMAT (markdown, for EACH part):
 ## Prompt Part [N]
 ### Storyboard Prompt
-(the actual image prompt, UNDER 2000 chars)
+[intro sentence]
+[visual style sentence]
+Scene 1: ...
+Scene 2: ...
+...
+Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
+
 ### Video Prompt
-(single compressed video prompt for this part, duration-aware, UNDER 2000 chars)
+[1 short natural paragraph describing video motion, under 2000 chars]
+
 ### JSON
-(machine-readable structure for this part)`;
+{ "part": N, "scenes": [...], "negative_prompt": "..." }`;
 
-    const userPrompt = `Generate a ${sceneCount}-scene storyboard for a ${duration}s TikTok affiliate video.
-Split into ${totalParts} prompt part(s): ${chunkInfo}
+    const userPrompt = `Generate a ${sceneCount}-scene UGC storyboard for a ${duration}s TikTok affiliate video.
+Split into ${totalParts} part(s): ${chunkInfo}
 
-Product: ${values.productName}
+Product name: ${values.productName}
 Category: ${values.productCategory}
-Content Style: ${values.contentStyle}
+Content vibe: ${values.contentStyle.toLowerCase()} (natural, NOT labeled)
 Environment: ${env}
-Camera Device: ${values.cameraDevice}
-Video Model Target: ${values.videoModel}
-${values.characterDesc ? `Character Description: ${values.characterDesc}` : ""}
-${values.productDesc ? `Product Description: ${values.productDesc}` : ""}
-${values.scriptMode === "manual" && values.manualScript ? `Manual Script: "${values.manualScript}"` : "Script Mode: Auto AI (generate affiliate-optimized dialogue)"}
+Camera: ${values.cameraDevice}
+Video model target: ${values.videoModel}
+${values.characterDesc ? `Character: ${values.characterDesc}` : ""}
+${values.productDesc ? `Product notes (context only, do NOT describe packaging): ${values.productDesc}` : ""}
+${values.scriptMode === "manual" && values.manualScript ? `Manual script voiceover: "${values.manualScript}"` : "Dialogue: natural, affiliate-friendly, 1-2 short lines"}
 
-Generate ALL ${totalParts} prompt part(s). Each part MUST be under 2000 characters.${totalParts > 1 ? " Each subsequent part must continue seamlessly from the previous." : ""}`;
+Write in Bahasa Indonesia (natural, like a real content creator briefing).
+Generate ALL ${totalParts} part(s) following the exact output format.${totalParts > 1 ? " Each subsequent part must continue naturally from the previous — same model, same product, same vibe." : ""}`;
 
     try {
       const res = await fetch("/api/promptgen", {
