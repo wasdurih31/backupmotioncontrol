@@ -6,11 +6,12 @@ import { eq } from 'drizzle-orm';
 import { decrypt } from '@/lib/crypto';
 
 // Model name mapping ke Gemini API model ID.
+// Nama model di dropdown user = model ID di API (sudah sama persis).
 const MODEL_MAP: Record<string, string> = {
-  'gemini-3.1-flash-lite': 'gemini-2.0-flash-lite',
-  'gemini-3.1-flash-lite-preview': 'gemini-2.0-flash-lite',
-  'gemini-3-flash-preview': 'gemini-2.0-flash',
-  'gemini-2.5-flash': 'gemini-2.5-flash-preview-05-20',
+  'gemini-3.1-flash-lite': 'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview': 'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview': 'gemini-3-flash-preview',
+  'gemini-2.5-flash': 'gemini-2.5-flash',
 };
 
 export async function POST(req: Request) {
