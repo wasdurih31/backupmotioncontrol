@@ -43,3 +43,13 @@ export const tutorials = pgTable('tutorials', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const userAiSettings = pgTable('user_ai_settings', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id).notNull(),
+  provider: varchar('provider', { length: 50 }).notNull().default('google'),
+  apiKeyEncrypted: text('api_key_encrypted'),
+  selectedModel: varchar('selected_model', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});

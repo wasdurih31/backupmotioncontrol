@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   Loader2,
-  Sparkles
+  Sparkles,
+  Wand2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGenerateStore } from "@/store/useGenerateStore";
@@ -19,6 +20,7 @@ import { useGenerateStore } from "@/store/useGenerateStore";
 const navLinks = [
   { name: "Home", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Generate Video", shortName: "Generate", href: "/dashboard/generate", icon: Sparkles },
+  { name: "Prompt Gen", shortName: "Prompt", href: "/dashboard/promptgen", icon: Wand2 },
   { name: "Tutorials", shortName: "Tutorials", href: "/dashboard/tutorial", icon: Video },
   { name: "Profile Settings", shortName: "Profile", href: "/dashboard/profile", icon: Settings },
 ];
