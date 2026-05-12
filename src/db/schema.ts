@@ -53,3 +53,15 @@ export const userAiSettings = pgTable('user_ai_settings', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const adminAiKeys = pgTable('admin_ai_keys', {
+  id: text('id').primaryKey(),
+  provider: varchar('provider', { length: 50 }).notNull(), // 'openrouter' | 'groq'
+  apiKeyEncrypted: text('api_key_encrypted').notNull(),
+  label: varchar('label', { length: 100 }),
+  isActive: boolean('is_active').default(true).notNull(),
+  usageCount: integer('usage_count').default(0).notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

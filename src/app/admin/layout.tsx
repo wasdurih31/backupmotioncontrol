@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   BookOpen,
-  Database
+  Database,
+  KeyRound
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,6 +25,7 @@ const adminLinks = [
   { name: "Create User", href: "/admin/create-user", icon: UserPlus },
   { name: "Live Activity", href: "/admin/activity", icon: Activity },
   { name: "Tutorials", href: "/admin/tutorials", icon: BookOpen },
+  { name: "AI Keys", href: "/admin/ai-keys", icon: KeyRound },
   { name: "Database Backup", href: "/admin/backup", icon: Database },
 ];
 

@@ -14,6 +14,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
+const MODEL_OPTIONS = [
+  { value: "openrouter|gemma-4-26b", label: "Gemma 4 26B (Free)", provider: "openrouter", model: "gemma-4-26b" },
+  { value: "groq|llama-4-scout", label: "Llama 4 Scout (Free)", provider: "groq", model: "llama-4-scout" },
+  { value: "groq|llama-4-maverick", label: "Llama 4 Maverick (Free)", provider: "groq", model: "llama-4-maverick" },
+  { value: "google|gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (BYOK)", provider: "google", model: "gemini-3.1-flash-lite" },
+  { value: "google|gemini-3-flash-preview", label: "Gemini 3 Flash Preview (BYOK)", provider: "google", model: "gemini-3-flash-preview" },
+  { value: "google|gemini-2.5-flash", label: "Gemini 2.5 Flash (BYOK)", provider: "google", model: "gemini-2.5-flash" },
+];
+
 const CONTENT_STYLES = ["Soft Sell", "Problem Solution", "Beauty Creator", "Testimonial"];
 const BEAUTY_ENVS = ["Bathroom Mirror", "Bedroom Natural Light", "Vanity Table", "Luxury Hotel Bathroom", "Minimalist Room"];
 const FASHION_ENVS = ["Cafe Lifestyle", "City Walk", "Bedroom Mirror", "Rooftop Casual", "Shopping Mall"];
@@ -25,6 +34,8 @@ const DURATIONS = ["5", "6", "8", "10", "15"];
 const VIDEO_MODELS = ["Veo 3.1 (8s)", "Seedance 2 (5-15s)", "Grok AI (6-10s)", "Sora 2 (12s)"];
 
 const schema = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
   productName: z.string().min(1, "Nama produk wajib diisi"),
   productCategory: z.string().min(1, "Kategori wajib dipilih"),
   contentStyle: z.string().min(1, "Pilih content style"),
@@ -49,6 +60,8 @@ export default function UGCAffiliatePageComponent() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      provider: "openrouter",
+      model: "gemma-4-26b",
       productName: "",
       productCategory: "beauty",
       contentStyle: "Soft Sell",
@@ -128,7 +141,7 @@ Generate all outputs.`;
       const res = await fetch("/api/promptgen", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemPrompt, userPrompt }),
+        body: JSON.stringify({ systemPrompt, userPrompt, provider: values.provider, model: values.model }),
       });
 
       const data = await res.json();
@@ -180,6 +193,27 @@ Generate all outputs.`;
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="model" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">AI Model</FormLabel>
+                    <Select
+                      value={`${form.getValues("provider")}|${form.getValues("model")}`}
+                      onValueChange={(val) => {
+                        const opt = MODEL_OPTIONS.find((o) => o.value === val);
+                        if (opt) {
+                          form.setValue("provider", opt.provider);
+                          form.setValue("model", opt.model);
+                        }
+                      }}
+                    >
+                      <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {MODEL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="productName" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Nama Produk *</FormLabel>
