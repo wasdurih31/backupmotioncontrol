@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Copy, CheckCircle2, ArrowLeft, Film } from "lucide-react";
+import { Loader2, Copy, CheckCircle2, ArrowLeft, Film, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -32,29 +32,49 @@ const CASUAL_DEVICES = ["iPhone 13", "iPhone 15 Pro", "iPhone 16 Pro", "Samsung 
 const PRO_DEVICES = ["Sony A7S III", "Sony FX3", "Canon R5", "Fujifilm XT5"];
 const ALL_DEVICES = [...CASUAL_DEVICES, ...PRO_DEVICES];
 const DURATIONS = ["5", "6", "8", "10", "15"];
-const SCENE_COUNTS = ["3", "4", "5", "6", "8", "10", "12"];
-const SCRIPT_MODES = ["auto", "manual"];
+const SCENE_COUNTS = ["3", "4", "5", "6", "7", "8", "9", "10", "12"];
 const VIDEO_MODELS = ["Veo 3.1 (8s)", "Seedance 2 (5-15s)", "Grok AI (6-10s)", "Sora 2 (12s)"];
 
 const schema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
   productName: z.string().min(1, "Nama produk wajib diisi"),
-  productCategory: z.string().min(1, "Kategori wajib dipilih"),
-  contentStyle: z.string().min(1, "Pilih content style"),
-  environment: z.string().min(1, "Pilih environment"),
+  productCategory: z.string().min(1),
+  contentStyle: z.string().min(1),
+  environment: z.string().min(1),
   customEnvironment: z.string().optional(),
-  cameraDevice: z.string().min(1, "Pilih camera device"),
-  duration: z.string().min(1, "Pilih durasi"),
-  sceneCount: z.string().min(1, "Pilih jumlah scene"),
-  scriptMode: z.string().min(1, "Pilih mode script"),
+  cameraDevice: z.string().min(1),
+  duration: z.string().min(1),
+  sceneCount: z.string().min(1),
+  scriptMode: z.string().min(1),
   manualScript: z.string().optional(),
-  videoModel: z.string().min(1, "Pilih video model"),
+  videoModel: z.string().min(1),
   characterDesc: z.string().optional(),
   productDesc: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+/**
+ * Hitung distribusi scene ke chunks.
+ * Preferred chunk size: 4 scenes. Distribute evenly.
+ * Examples: 7→[4,3], 8→[4,4], 9→[3,3,3], 10→[4,3,3], 12→[4,4,4]
+ */
+function computeChunks(total: number): Array<{ start: number; end: number }> {
+  if (total <= 6) return [{ start: 1, end: total }];
+  const numChunks = Math.ceil(total / 4);
+  const baseSize = Math.floor(total / numChunks);
+  let remainder = total % numChunks;
+  const chunks: Array<{ start: number; end: number }> = [];
+  let current = 1;
+  for (let i = 0; i < numChunks; i++) {
+    const size = baseSize + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    chunks.push({ start: current, end: current + size - 1 });
+    current += size;
+  }
+  return chunks;
+}
 
 export default function StoryboardUGCPage() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,31 +116,55 @@ export default function StoryboardUGCPage() {
 
     const env = values.customEnvironment?.trim() || values.environment;
 
+    // ── Scene Chunking ──
+    const chunks = computeChunks(sceneCount);
+    const totalParts = chunks.length;
+    const chunkInfo = chunks.map((c, i) => `Part ${i + 1}: Scene ${c.start}-${c.end}`).join(", ");
+
     const systemPrompt = `You are an expert AI prompt generator specialized in TikTok affiliate UGC storyboards.
 
-RULES:
-- Generate compressed, modular prompts (max ~2000 chars per scene prompt)
+CRITICAL RULES:
+- Each prompt part MUST stay under 2000 characters (preferred: 1200-1800 chars)
 - Use short descriptive phrases, NOT long cinematic paragraphs
-- Each scene MUST include: scene number, goal, camera angle, character action, product interaction, environment, motion, duration
-- MAX 6 scenes per part. If total scenes > 6, split into PART 1 and PART 2
-- PART 2 must continue: same character, same product, same environment, same emotion, same camera style
-- Follow affiliate pacing structure based on duration
-- Always add character lock: "Use the exact same person from reference image. Maintain identical facial features."
-- Always add product lock: "Use the exact same product from reference image. Maintain identical packaging."
+- Each scene: scene number, goal, camera angle, character action, product interaction, environment, motion, duration
 - Camera style: ${cameraStyle}
 - Environment: ${env}
-- Duration per storyboard part: max 15 seconds
 
-OUTPUT FORMAT:
-1. STORYBOARD PROMPT (markdown, scene by scene)
-2. VIDEO PROMPT (single compressed prompt for AI video generation, duration-aware)
-3. JSON (machine-readable structure)
+SCENE CHUNKING:
+- Total scenes: ${sceneCount}
+- Split into ${totalParts} prompt part(s): ${chunkInfo}
+${totalParts > 1 ? `
+CONTINUATION RULES (CRITICAL for multi-part):
+- Every part MUST continue from previous part seamlessly
+- Maintain: same character, same product, same environment, same emotional progression, same visual style, same camera style
+- Each new part starts with continuation context: "continuation of previous storyboard, same [character], same [product], same [environment], same visual style"
+- DO NOT restart story in new part
+- BAD: Part 2 feels like completely different video
+- GOOD: Part 2 feels like direct continuation from Part 1
+` : ""}
+PROMPT STRUCTURE (per part):
+1. GLOBAL STYLE (camera, lighting, mood — 1 line)
+2. REFERENCE LOCK (character + product lock)
+${totalParts > 1 ? "3. CONTINUATION CONTEXT\n4. SCENE LIST\n5. NEGATIVE PROMPT" : "3. SCENE LIST\n4. NEGATIVE PROMPT"}
 
-Duration structure:
-- 5-8s: Hook → Problem → Solution → CTA
-- 10-15s: Hook → Problem → Reaction → Solution → Result → CTA`;
+CHARACTER LOCK: "Use the exact same person from reference image. Maintain identical facial features and appearance."
+PRODUCT LOCK: "Use the exact same product from reference image. Maintain identical packaging and label design."
+
+AFFILIATE PACING:
+- 5-8s: Hook > Problem > Solution > CTA
+- 10-15s: Hook > Problem > Reaction > Solution > Result > CTA
+
+OUTPUT FORMAT (for EACH part separately):
+## Prompt Part [N]
+### Storyboard Prompt
+(the actual image prompt, UNDER 2000 chars)
+### Video Prompt
+(single compressed video prompt for this part, duration-aware, UNDER 2000 chars)
+### JSON
+(machine-readable structure for this part)`;
 
     const userPrompt = `Generate a ${sceneCount}-scene storyboard for a ${duration}s TikTok affiliate video.
+Split into ${totalParts} prompt part(s): ${chunkInfo}
 
 Product: ${values.productName}
 Category: ${values.productCategory}
@@ -132,7 +176,7 @@ ${values.characterDesc ? `Character Description: ${values.characterDesc}` : ""}
 ${values.productDesc ? `Product Description: ${values.productDesc}` : ""}
 ${values.scriptMode === "manual" && values.manualScript ? `Manual Script: "${values.manualScript}"` : "Script Mode: Auto AI (generate affiliate-optimized dialogue)"}
 
-Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video Prompt, JSON).`;
+Generate ALL ${totalParts} prompt part(s). Each part MUST be under 2000 characters.${totalParts > 1 ? " Each subsequent part must continue seamlessly from the previous." : ""}`;
 
     try {
       const res = await fetch("/api/promptgen", {
@@ -148,7 +192,7 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
       }
 
       setResult(data.result);
-      toast.success("Prompt berhasil di-generate!");
+      toast.success(`Prompt berhasil di-generate! (${totalParts} part${totalParts > 1 ? "s" : ""})`);
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan");
     } finally {
@@ -164,6 +208,10 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  // Preview chunking info
+  const watchedSceneCount = parseInt(form.watch("sceneCount") || "6");
+  const previewChunks = computeChunks(watchedSceneCount);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
@@ -191,17 +239,14 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="model" render={({ field }) => (
+                <FormField control={form.control} name="model" render={() => (
                   <FormItem>
                     <FormLabel className="text-xs">AI Model</FormLabel>
                     <Select
                       value={`${form.getValues("provider")}|${form.getValues("model")}`}
                       onValueChange={(val) => {
                         const opt = MODEL_OPTIONS.find((o) => o.value === val);
-                        if (opt) {
-                          form.setValue("provider", opt.provider);
-                          form.setValue("model", opt.model);
-                        }
+                        if (opt) { form.setValue("provider", opt.provider); form.setValue("model", opt.model); }
                       }}
                     >
                       <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
@@ -235,7 +280,6 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
                       </Select>
                     </FormItem>
                   )} />
-
                   <FormField control={form.control} name="contentStyle" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Content Style</FormLabel>
@@ -255,21 +299,16 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
                       <FormLabel className="text-xs">Environment</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {ALL_ENVS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent>{ALL_ENVS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
-
                   <FormField control={form.control} name="cameraDevice" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Camera Device</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {ALL_DEVICES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent>{ALL_DEVICES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
@@ -288,37 +327,39 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
                       <FormLabel className="text-xs">Durasi (s)</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {DURATIONS.map((d) => <SelectItem key={d} value={d}>{d}s</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent>{DURATIONS.map((d) => <SelectItem key={d} value={d}>{d}s</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
-
                   <FormField control={form.control} name="sceneCount" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Scenes</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {SCENE_COUNTS.map((s) => <SelectItem key={s} value={s}>{s} scenes</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent>{SCENE_COUNTS.map((s) => <SelectItem key={s} value={s}>{s} scenes</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
-
                   <FormField control={form.control} name="videoModel" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Video Model</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {VIDEO_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
+                        <SelectContent>{VIDEO_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
                   )} />
                 </div>
+
+                {/* Chunking preview */}
+                {previewChunks.length > 1 && (
+                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-300/80">
+                    <span className="font-bold text-blue-300">Auto-split:</span>{" "}
+                    {previewChunks.map((c, i) => `Part ${i + 1} (Scene ${c.start}-${c.end})`).join(" → ")}
+                    <br />
+                    <span className="text-blue-400/60">Setiap part max 2000 karakter dengan continuation.</span>
+                  </div>
+                )}
 
                 <FormField control={form.control} name="scriptMode" render={({ field }) => (
                   <FormItem>
@@ -399,13 +440,5 @@ Generate the full storyboard with all 3 output formats (Storyboard Prompt, Video
         </div>
       </div>
     </div>
-  );
-}
-
-function Sparkles(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-    </svg>
   );
 }
