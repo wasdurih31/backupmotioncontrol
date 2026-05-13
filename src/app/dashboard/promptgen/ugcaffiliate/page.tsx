@@ -141,29 +141,31 @@ Gunakan gaya fotografi smartphone realistis, pencahayaan alami, estetik media so
 Negative prompt: no subtitles, no text overlay, no infographic design, no poster layout, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### VIDEO PROMPT
-Scene 1:
-Motion: [model action + camera movement, 1 short sentence]
-Script: "[dialogue in Bahasa Indonesia, natural spoken style]"
+Scene 1: [visual description of what model does]
+Scene 2: [visual description]
+Scene 3: [visual description]
+Scene 4: [visual description]
+...repeat for 4-6 scenes matching ${values.duration}s duration...
 
-Scene 2:
-Motion: [model action + camera movement]
-Script: "[dialogue]"
+Voice Over: "[One connected conversational voice over. Must sound like a real TikTok creator — emotional, relatable, casual Bahasa Indonesia. Flows naturally across all scenes.]"
 
-...repeat for all scenes (4-6 scenes for ${values.duration}s video)...
+Camera Style: [camera + shooting style]
+Motion Style: [movement description]
 
 VIDEO PROMPT RULES:
-- Each scene: Motion + Script
-- Motion: physical action + camera movement (handheld, zoom, static, etc.)
-- Script: short spoken dialogue, natural Bahasa Indonesia, affiliate-friendly
-- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual script: "${values.manualScript}"` : "Generate natural affiliate dialogue"}
-- Keep each Script line to 2-8 words
-- Total script fits within ${values.duration}s at ~2-3 words/second
+- Scenes: VISUALS ONLY (what model does, no dialogue mixed in)
+- Voice Over: ONE connected conversational paragraph (not per-scene fragments)
+- Must feel: spontaneous, emotional, natural spoken Indonesian, social-media native
+- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual voice over: "${values.manualScript}"` : "Generate natural TikTok creator voice over"}
+- Total voice over: ${parseInt(values.duration) <= 6 ? "15-20" : parseInt(values.duration) <= 8 ? "20-35" : parseInt(values.duration) <= 10 ? "35-50" : "50-80"} words
+- GOOD: "Aduh kenapa kulit aku akhir-akhir ini kering banget sih..."
+- BAD: "Kulit terasa kering." "Kasar tidak nyaman."
 
 ### JSON Image
 { "variants": [{"variant":1,"prompt":"...","negative_prompt":"..."},{"variant":2,...},...] }
 
 ### JSON Video
-{ "scenes": [{"scene":1,"motion":"...","script":"..."},...],"duration":"${values.duration}s" }`;
+{ "scenes": [{"scene":1,"visual":"..."},...],"voice_over":"...","camera_style":"...","motion_style":"...","duration":"${values.duration}s" }`;
 
     const userPrompt = `Generate 4 standalone UGC affiliate photo prompts + 1 video prompt.
 

@@ -302,29 +302,32 @@ Render each "Scene N: ..." as the caption text below its respective photo panel.
 Negative prompt: no subtitles on photo, no text overlay on image, no tiktok caption, no infographic design, no poster design, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### Video Prompt
-Scene 1:
-Motion: [model action + camera movement, 1 short sentence]
-Script: "[dialogue in Bahasa Indonesia, natural spoken style]"
-
-Scene 2:
-Motion: [model action + camera movement]
-Script: "[dialogue]"
-
+Scene 1: [visual description of what model does, 1 short sentence]
+Scene 2: [visual description]
+Scene 3: [visual description]
 ...repeat for all scenes in this part...
 
+Voice Over: "[One connected conversational voice over that flows naturally across all scenes. Must sound like a real TikTok creator talking — emotional, relatable, casual Bahasa Indonesia. NOT robotic captions. NOT slogan fragments. The voice over tells a story that matches the scene progression.]"
+
+Camera Style: [camera device + shooting style, e.g. "iPhone handheld selfie style"]
+Motion Style: [movement description, e.g. "natural handheld movement, realistic body motion, casual creator pacing"]
+
 IMPORTANT VIDEO PROMPT RULES:
-- Each scene has exactly 2 fields: Motion + Script
-- Motion: describe physical action + camera movement (handheld shake, zoom in, static shot, etc.)
-- Script: short spoken dialogue in quotation marks, natural Bahasa Indonesia, affiliate-friendly
-- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual script distributed across scenes: "${values.manualScript}"` : "Generate natural affiliate dialogue (hook → problem → solution → result)"}
-- Keep each Script line to 2-8 words (natural speaking pace)
-- Total script must fit within ${values.duration}s at ~2-3 words/second
+- Scenes: describe VISUALS ONLY (what model does, no dialogue mixed in)
+- Voice Over: ONE connected conversational paragraph (not per-scene fragments)
+- Voice Over must feel: spontaneous, emotional, natural spoken Indonesian, social-media native
+- Voice Over must match scene progression (problem → frustration → discovery → application → result → recommendation)
+- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual voice over: "${values.manualScript}"` : "Generate natural TikTok creator voice over"}
+- Total voice over word count target for ${values.duration}s: ${parseInt(values.duration) <= 6 ? "15-20" : parseInt(values.duration) <= 8 ? "20-35" : parseInt(values.duration) <= 10 ? "35-50" : "50-80"} words
+- DO NOT use: robotic captions, slogan fragments, corporate ad style
+- GOOD: "Aduh kenapa kulit aku akhir-akhir ini kering banget sih. Padahal udah pakai skincare tapi masih terasa kasar."
+- BAD: "Kulit terasa kering." "Kasar tidak nyaman."
 
 ### JSON Image
 { "part": N, "layout": "GRID", "scenes": [{"scene":1,"description":"..."},...], "visual_style": "...", "negative_prompt": "..." }
 
 ### JSON Video
-{ "part": N, "scenes": [{"scene":1,"motion":"...","script":"..."},...], "duration": "${duration}s" }
+{ "part": N, "scenes": [{"scene":1,"visual":"..."},...], "voice_over": "...", "camera_style": "...", "motion_style": "...", "duration": "${duration}s" }
 
 For this part, use grid size: ${chunks.map((c, i) => `Part ${i + 1} = ${gridFor(c.end - c.start + 1)}`).join(", ")}.`;
 
