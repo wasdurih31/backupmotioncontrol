@@ -289,10 +289,26 @@ Render each "Scene N: ..." as the caption text below its respective photo panel.
 Negative prompt: no subtitles on photo, no text overlay on image, no tiktok caption, no infographic design, no poster design, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### Video Prompt
-[1 short natural paragraph describing the ${duration}s video motion/pacing, no labels, duration-aware${values.scriptMode === "manual" && values.manualScript ? `. Incorporate voiceover: "${values.manualScript}"` : ""}]
+Scene 1:
+Motion: [model action + camera movement, 1 short sentence]
+Script: "[dialogue in Bahasa Indonesia, natural spoken style]"
+
+Scene 2:
+Motion: [model action + camera movement]
+Script: "[dialogue]"
+
+...repeat for all scenes in this part...
+
+IMPORTANT VIDEO PROMPT RULES:
+- Each scene has exactly 2 fields: Motion + Script
+- Motion: describe physical action + camera movement (handheld shake, zoom in, static shot, etc.)
+- Script: short spoken dialogue in quotation marks, natural Bahasa Indonesia, affiliate-friendly
+- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual script distributed across scenes: "${values.manualScript}"` : "Generate natural affiliate dialogue (hook → problem → solution → result)"}
+- Keep each Script line to 2-8 words (natural speaking pace)
+- Total script must fit within ${values.duration}s at ~2-3 words/second
 
 ### JSON
-{ "part": N, "layout": "GRID", "scenes": [...], "negative_prompt": "..." }
+{ "part": N, "layout": "GRID", "scenes": [{"motion":"...","script":"..."}], "negative_prompt": "..." }
 
 For this part, use grid size: ${chunks.map((c, i) => `Part ${i + 1} = ${gridFor(c.end - c.start + 1)}`).join(", ")}.`;
 

@@ -141,7 +141,23 @@ Gunakan gaya fotografi smartphone realistis, pencahayaan alami, estetik media so
 Negative prompt: no subtitles, no text overlay, no infographic design, no poster layout, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### VIDEO PROMPT
-[1 short natural paragraph describing the ${values.duration}s video motion — no labels, no quotes${values.scriptMode === "manual" && values.manualScript ? `. Incorporate voiceover: "${values.manualScript}"` : ""}]
+Scene 1:
+Motion: [model action + camera movement, 1 short sentence]
+Script: "[dialogue in Bahasa Indonesia, natural spoken style]"
+
+Scene 2:
+Motion: [model action + camera movement]
+Script: "[dialogue]"
+
+...repeat for all scenes (4-6 scenes for ${values.duration}s video)...
+
+VIDEO PROMPT RULES:
+- Each scene: Motion + Script
+- Motion: physical action + camera movement (handheld, zoom, static, etc.)
+- Script: short spoken dialogue, natural Bahasa Indonesia, affiliate-friendly
+- ${values.scriptMode === "manual" && values.manualScript ? `Use this manual script: "${values.manualScript}"` : "Generate natural affiliate dialogue"}
+- Keep each Script line to 2-8 words
+- Total script fits within ${values.duration}s at ~2-3 words/second
 
 ### JSON
 { "variants": [...], "video_prompt": "...", "negative_prompt": "..." }`;
