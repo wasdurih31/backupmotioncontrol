@@ -4,13 +4,15 @@ import { jwtVerify } from 'jose';
 import { del } from '@vercel/blob';
 import { db } from '@/db';
 import { users, tasks } from '@/db/schema';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql, gt } from 'drizzle-orm';
 import { runFreepikCall } from '@/lib/freepikQueue';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'universeai-super-secret-key-2026');
 
 // Maksimum task berjalan bersamaan per user (status: queued / processing).
 const MAX_CONCURRENT_PER_USER = 5;
+// Task yang lebih tua dari ini dianggap expired/orphan dan tidak dihitung.
+const TASK_MAX_AGE_MS = 40 * 60 * 1000; // 40 menit
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -25,8 +27,9 @@ async function getSession() {
   }
 }
 
-/** Hitung task aktif user (queued + processing). */
+/** Hitung task aktif user (queued + processing) yang belum expired. */
 async function countActive(userId: string): Promise<number> {
+  const cutoff = new Date(Date.now() - TASK_MAX_AGE_MS);
   const rows = await db
     .select({ c: sql<number>`count(*)::int` })
     .from(tasks)
@@ -34,6 +37,7 @@ async function countActive(userId: string): Promise<number> {
       and(
         eq(tasks.userId, userId),
         inArray(tasks.status, ['queued', 'processing']),
+        gt(tasks.createdAt, cutoff),
       ),
     );
   return rows[0]?.c ?? 0;
@@ -54,6 +58,18 @@ export async function POST(req: Request) {
     }
 
     // ── Pre-check slot concurrency user ──
+    // Juga bersihkan task orphan (stuck >40 menit) agar tidak blokir user.
+    const cutoff = new Date(Date.now() - TASK_MAX_AGE_MS);
+    await db.update(tasks).set({ status: 'failed' as any })
+      .where(
+        and(
+          eq(tasks.userId, session.id),
+          inArray(tasks.status, ['queued', 'processing']),
+          // Task yang createdAt <= cutoff = sudah expired
+          sql`${tasks.createdAt} <= ${cutoff}`,
+        ),
+      );
+
     const preCount = await countActive(session.id);
     if (preCount >= MAX_CONCURRENT_PER_USER) {
       await cleanupBlobs([videoUrl, imageUrl]);
