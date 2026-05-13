@@ -100,7 +100,7 @@ function ensureNegativePromptLabel(text: string): string {
   const sections = text.split(/(?=^#{1,3}\s)/gm);
 
   const IMAGE_HEADINGS = /^#{1,3}\s*(Storyboard Prompt|IMAGE PROMPT VARIANT\s*\d+)/i;
-  const NEG_KEYWORDS = /(text overlay|subtitles|typography|infographic layout|poster design|watermark|distorted face|extra fingers|blurry product|CGI skin|plastic skin|over cinematic lighting)/i;
+  const NEG_KEYWORDS = /(text overlay|subtitles|typography|infographic|poster|watermark|distorted face|extra fingers|blurry product|CGI skin|plastic skin|over cinematic|no subtitles|no text overlay|no infographic|no poster)/i;
   const NEG_LABEL = /^\s*Negative\s*prompt\s*:/im;
 
   const processed = sections.map((section) => {
@@ -198,4 +198,4 @@ function escapeRegex(s: string): string {
  * Universal negative prompt yang ditambahkan di bawah.
  */
 export const UNIVERSAL_NEGATIVE_PROMPT =
-  'text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting';
+  'no subtitles, no text overlay, no infographic design, no poster layout, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting';

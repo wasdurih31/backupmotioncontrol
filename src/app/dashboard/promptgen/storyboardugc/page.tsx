@@ -204,8 +204,8 @@ export default function StoryboardUGCPage() {
     const isSmartphone = CASUAL_DEVICES.includes(values.cameraDevice);
 
     const cameraStyle = isSmartphone
-      ? "smartphone realism, social media exposure, front camera feel, natural lighting"
-      : "cinematic depth of field, professional lighting response, shallow bokeh";
+      ? `${values.cameraDevice} selfie camera, natural smartphone photography style, authentic social media aesthetic`
+      : `${values.cameraDevice}, cinematic depth of field, professional lighting response`;
 
     const env = values.customEnvironment?.trim() || values.environment;
 
@@ -214,49 +214,45 @@ export default function StoryboardUGCPage() {
     const totalParts = chunks.length;
     const chunkInfo = chunks.map((c, i) => `Part ${i + 1}: Scene ${c.start}-${c.end}`).join(", ");
 
-    const systemPrompt = `You are a professional storyboard artist specialized in creating STORYBOARD IMAGES for UGC TikTok affiliate content.
+    // ── Grid Layout Auto-Rule ──
+    // Per-part grid size based on scenes in that part (not total).
+    function gridFor(n: number): string {
+      if (n <= 4) return "2x2";
+      if (n <= 6) return "2x3";
+      if (n <= 9) return "3x3";
+      return "4x3";
+    }
+
+    const systemPrompt = `You are a professional storyboard artist creating COMIC-GRID STORYBOARD SHEET images for UGC affiliate content.
 
 YOUR TASK:
-- Create an IMAGE GENERATION PROMPT that instructs an AI image model (GPT Image 2, Nano Banana, Midjourney, i2i models) to produce a storyboard sheet image.
-- NOT a video description. NOT a video script.
-- The output is a prompt that creates a visual storyboard artifact (panel sheet) that the user can then use as reference for video generation.
+Create an IMAGE GENERATION PROMPT that produces a clean storyboard SHEET (comic-grid layout with caption area below each panel), NOT a video description.
 
-CRITICAL — STORYBOARD PROMPT MUST START WITH COMMAND SENTENCE:
-The Image Prompt MUST begin with explicit image-generation command. Example:
-- "Buatlah gambar storyboard UGC 6 adegan dengan layout grid 2x3 yang menampilkan..."
-- "Create a 6-panel UGC storyboard sheet (2x3 grid) showing..."
-- "Generate a storyboard image with N panels depicting..."
+Reference visual style of the output image:
+- Photo panels arranged in a clean grid (2x2 / 2x3 / 3x3 / 4x3 depending on scene count)
+- Each panel is a real photograph (smartphone UGC style)
+- Below each panel: a dedicated caption area with the scene label "Scene N" and a short description
+- Text stays OUTSIDE the photo frame — NEVER as overlay on the image
+- White/minimal background between panels, editorial magazine feel
 
-DO NOT start with:
-- "Video ini menunjukkan..."
-- "This video shows..."
-- "Video ini menggambarkan..."
-(These describe a video — they are for the Video Prompt section, NOT the Image Prompt)
+CRITICAL DO NOT USE — these trigger AI to render subtitles/overlays/poster designs:
+- Spoken dialogue / quotation marks ("Wow terasa lembut!")
+- Screenplay terms: Hook, Problem, Solution, CTA, Goal, Result, Reaction
+- Metadata labels: GLOBAL STYLE:, CHARACTER LOCK:, PRODUCT LOCK:, Camera Angle:
+- Words like "subtitles", "caption", "text overlay" used in positive context
+- TikTok-style caption text
 
-LAYOUT FORMULA for storyboard image:
-- 3 scenes → 1x3 horizontal strip OR 3x1 vertical
-- 4 scenes → 2x2 grid
-- 5-6 scenes → 2x3 grid
-- 7-8 scenes (per part) → distribute across parts
-
-PROMPT STYLE:
-- Natural scene descriptions inside each panel
-- Each scene: 1 short sentence (10-25 words)
-- "Scene 1: ..." / "Panel 1: ..." format
-- Visual, direct, feels like storyboard direction
-
-CRITICAL DO NOT USE (trigger AI to render text overlay / infographic layouts):
-- Screenplay labels: Hook, Problem, Solution, CTA, Goal, Reaction, Result
-- Metadata blocks: GLOBAL STYLE:, CHARACTER LOCK:, PRODUCT LOCK:, Camera Angle:, etc.
-- Screenplay formatting
+USE INSTEAD — Pure visual description per scene:
+- Subject + action + camera framing + lighting
+- 1 short visual sentence per scene (10-25 words)
+- NO dialogue, NO quotes, NO spoken text
 
 PRODUCT CONSISTENCY (CRITICAL):
-- DO NOT describe product packaging (NO "frosted jar", "white cap", "pink label")
-- ALWAYS use: "produk sesuai gambar referensi" atau "produk dari gambar referensi"
-- This prevents hallucinated packaging and ensures i2i reference is respected
+- DO NOT describe packaging (no "frosted jar", "white cap", "pink label")
+- ALWAYS use: "produk sesuai gambar referensi" / "produk dari gambar referensi"
 
 CHARACTER CONSISTENCY:
-- Naturally repeat: "model yang sama", "wanita yang sama", "karakter yang sama" in each scene
+- Naturally repeat: "wanita yang sama", "model yang sama" across scenes
 - NEVER use "CHARACTER LOCK:" label
 
 SCENE CHUNKING:
@@ -265,11 +261,11 @@ SCENE CHUNKING:
 - Each part stays under 2000 chars
 ${totalParts > 1 ? `
 MULTI-PART CONTINUATION:
-- Start subsequent parts with: "Lanjutan storyboard sebelumnya dengan model yang sama dan produk dari gambar referensi yang sama..."
-- Maintain same visual style, same environment, same mood
+- Start subsequent parts with: "Lanjutan storyboard sebelumnya dengan wanita yang sama dan produk dari gambar referensi yang sama."
+- Same visual style, same environment, same mood
 - DO NOT restart from scratch
 ` : ""}
-CAMERA STYLE for this project: ${cameraStyle}
+CAMERA STYLE: ${cameraStyle}
 ENVIRONMENT: ${env}
 
 OUTPUT FORMAT (markdown, for EACH part):
@@ -277,23 +273,35 @@ OUTPUT FORMAT (markdown, for EACH part):
 ## Prompt Part [N]
 
 ### Storyboard Prompt
-[Command sentence: "Buatlah gambar storyboard UGC [X] adegan dalam layout grid [YxZ]..."]
-[Visual style: 1 line — camera, lighting, aesthetic]
-Scene 1: [model yang sama + action + camera + lighting]
-Scene 2: [model yang sama + action + camera + lighting]
+Create a clean UGC storyboard comic grid layout.
+Arrange all scenes in a [GRID] storyboard grid.
+Each frame should contain: visual image panel + dedicated caption area below the frame.
+Text must stay outside image frames. Do not place subtitles or overlay text directly on images.
+Use realistic smartphone photography style, natural lighting, authentic social media aesthetic, ${cameraStyle}.
+Setting: ${env}.
+
+Scene 1: [wanita yang sama + action + framing + lighting]
+Scene 2: [wanita yang sama + action + framing + lighting]
 ...
-Negative prompt: text overlay, subtitles, typography, infographic layout, poster design, watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
+
+Negative prompt: no subtitles, no text overlay, no infographic design, no poster layout, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### Video Prompt
-[1 short natural paragraph describing the video motion/pacing, no labels, duration-aware, under 2000 chars]
+[1 short natural paragraph describing the ${duration}s video motion/pacing, no labels, duration-aware${values.scriptMode === "manual" && values.manualScript ? `. Incorporate voiceover: "${values.manualScript}"` : ""}]
 
 ### JSON
-{ "part": N, "layout": "2x3", "scenes": [...], "negative_prompt": "..." }`;
+{ "part": N, "layout": "GRID", "scenes": [...], "negative_prompt": "..." }
 
-    const userPrompt = `Generate a ${sceneCount}-scene UGC storyboard for a ${duration}s TikTok affiliate video.
+For this part, use grid size matching the number of scenes in the part (${chunks.map((c, i) => `Part ${i + 1}: ${gridFor(c.end - c.start + 1)}`).join(", ")}).`;
+
+    const userPrompt = `Generate a ${sceneCount}-scene UGC storyboard sheet for a ${duration}s TikTok affiliate video.
 Split into ${totalParts} part(s): ${chunkInfo}
 
-CRITICAL: The "Storyboard Prompt" section MUST start with a command to create a storyboard IMAGE (e.g. "Buatlah gambar storyboard UGC..."), NOT a video description.
+CRITICAL: Each "Storyboard Prompt" section MUST:
+- Start with: "Create a clean UGC storyboard comic grid layout."
+- Specify grid size (${chunks.map((c, i) => `Part ${i + 1}: ${gridFor(c.end - c.start + 1)}`).join(", ")})
+- Include instruction that text must stay OUTSIDE image frames
+- List each scene as pure visual description (no dialogue, no quotes)
 
 Product name: ${values.productName}
 Category: ${values.productCategory}
@@ -303,10 +311,10 @@ Camera: ${values.cameraDevice}
 Video model target: ${values.videoModel}
 ${values.characterDesc ? `Character: ${values.characterDesc}` : ""}
 ${values.productDesc ? `Product notes (context only, do NOT describe packaging): ${values.productDesc}` : ""}
-${values.scriptMode === "manual" && values.manualScript ? `Manual voiceover (for Video Prompt only): "${values.manualScript}"` : "Dialogue: natural, affiliate-friendly, 1-2 short lines"}
+${values.scriptMode === "manual" && values.manualScript ? `Voiceover (for Video Prompt only, NOT image prompt): "${values.manualScript}"` : ""}
 
 Write in Bahasa Indonesia (natural creator style).
-Generate ALL ${totalParts} part(s) exactly in the specified output format.${totalParts > 1 ? " Subsequent parts start with 'Lanjutan storyboard sebelumnya...' phrasing." : ""}`;
+Generate ALL ${totalParts} part(s) in the EXACT output format above.`;
 
     try {
       const res = await fetch("/api/promptgen", {
