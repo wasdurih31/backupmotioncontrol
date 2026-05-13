@@ -77,34 +77,45 @@ function computeChunks(total: number): Array<{ start: number; end: number }> {
 }
 
 /**
- * Parse AI output menjadi sections terpisah: Storyboard Prompt, Video Prompt, JSON.
- * AI output format: ## Prompt Part N → ### Storyboard Prompt → ### Video Prompt → ### JSON
+ * Parse AI output menjadi sections terpisah.
+ * AI output format: ## Prompt Part N → ### Storyboard Prompt → ### Video Prompt → ### JSON Image → ### JSON Video
  */
-function parseResult(raw: string): { storyboard: string; video: string; json: string } {
-  // Coba split berdasarkan heading markdown
+function parseResult(raw: string): { storyboard: string; video: string; jsonImage: string; jsonVideo: string } {
   const storyboardParts: string[] = [];
   const videoParts: string[] = [];
-  const jsonParts: string[] = [];
+  const jsonImageParts: string[] = [];
+  const jsonVideoParts: string[] = [];
 
   // Regex untuk menangkap section
   const storyboardRegex = /###?\s*Storyboard Prompt\s*\n([\s\S]*?)(?=###?\s*Video Prompt|###?\s*JSON|##\s*Prompt Part|$)/gi;
   const videoRegex = /###?\s*Video Prompt\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*Storyboard|##\s*Prompt Part|$)/gi;
-  const jsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*Storyboard|###?\s*Video|##\s*Prompt Part|$)/gi;
+  const jsonImageRegex = /###?\s*JSON\s*(?:Image|Gambar)\s*\n([\s\S]*?)(?=###?\s*JSON\s*(?:Video)|###?\s*Storyboard|###?\s*Video|##\s*Prompt Part|$)/gi;
+  const jsonVideoRegex = /###?\s*JSON\s*(?:Video)\s*\n([\s\S]*?)(?=###?\s*Storyboard|###?\s*Video Prompt|##\s*Prompt Part|$)/gi;
 
   let match;
   while ((match = storyboardRegex.exec(raw)) !== null) storyboardParts.push(match[1].trim());
   while ((match = videoRegex.exec(raw)) !== null) videoParts.push(match[1].trim());
-  while ((match = jsonRegex.exec(raw)) !== null) jsonParts.push(match[1].trim());
+  while ((match = jsonImageRegex.exec(raw)) !== null) jsonImageParts.push(match[1].trim());
+  while ((match = jsonVideoRegex.exec(raw)) !== null) jsonVideoParts.push(match[1].trim());
+
+  // Fallback: kalau AI hanya output satu "### JSON" tanpa split, coba parse
+  if (jsonImageParts.length === 0 && jsonVideoParts.length === 0) {
+    const genericJsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*Storyboard|###?\s*Video|##\s*Prompt Part|$)/gi;
+    while ((match = genericJsonRegex.exec(raw)) !== null) {
+      jsonImageParts.push(match[1].trim());
+    }
+  }
 
   return {
     storyboard: storyboardParts.length > 0 ? storyboardParts.join("\n\n---\n\n") : raw,
     video: videoParts.length > 0 ? videoParts.join("\n\n---\n\n") : "",
-    json: jsonParts.length > 0 ? jsonParts.join("\n\n") : "",
+    jsonImage: jsonImageParts.length > 0 ? jsonImageParts.join("\n\n") : "",
+    jsonVideo: jsonVideoParts.length > 0 ? jsonVideoParts.join("\n\n") : "",
   };
 }
 
 function ResultTabs({ result }: { result: string }) {
-  const [activeTab, setActiveTab] = useState<"storyboard" | "video" | "json">("storyboard");
+  const [activeTab, setActiveTab] = useState<"storyboard" | "video" | "jsonImage" | "jsonVideo">("storyboard");
   const [copiedTab, setCopiedTab] = useState(false);
 
   const parsed = parseResult(result);
@@ -112,7 +123,8 @@ function ResultTabs({ result }: { result: string }) {
   const tabs = [
     { id: "storyboard" as const, label: "🖼️ Image Prompt", content: parsed.storyboard },
     { id: "video" as const, label: "🎬 Video Prompt", content: parsed.video },
-    { id: "json" as const, label: "{ } JSON", content: parsed.json },
+    { id: "jsonImage" as const, label: "{ } JSON Image", content: parsed.jsonImage },
+    { id: "jsonVideo" as const, label: "{ } JSON Video", content: parsed.jsonVideo },
   ];
 
   const currentContent = tabs.find((t) => t.id === activeTab)?.content || result;
@@ -120,7 +132,8 @@ function ResultTabs({ result }: { result: string }) {
   const handleCopyTab = () => {
     navigator.clipboard.writeText(currentContent);
     setCopiedTab(true);
-    toast.success(`${activeTab === "storyboard" ? "Image" : activeTab === "video" ? "Video" : "JSON"} prompt copied!`);
+    const labels = { storyboard: "Image", video: "Video", jsonImage: "JSON Image", jsonVideo: "JSON Video" };
+    toast.success(`${labels[activeTab]} prompt copied!`);
     setTimeout(() => setCopiedTab(false), 2000);
   };
 
@@ -307,8 +320,11 @@ IMPORTANT VIDEO PROMPT RULES:
 - Keep each Script line to 2-8 words (natural speaking pace)
 - Total script must fit within ${values.duration}s at ~2-3 words/second
 
-### JSON
-{ "part": N, "layout": "GRID", "scenes": [{"motion":"...","script":"..."}], "negative_prompt": "..." }
+### JSON Image
+{ "part": N, "layout": "GRID", "scenes": [{"scene":1,"description":"..."},...], "visual_style": "...", "negative_prompt": "..." }
+
+### JSON Video
+{ "part": N, "scenes": [{"scene":1,"motion":"...","script":"..."},...], "duration": "${duration}s" }
 
 For this part, use grid size: ${chunks.map((c, i) => `Part ${i + 1} = ${gridFor(c.end - c.start + 1)}`).join(", ")}.`;
 

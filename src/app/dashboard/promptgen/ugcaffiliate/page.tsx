@@ -159,8 +159,11 @@ VIDEO PROMPT RULES:
 - Keep each Script line to 2-8 words
 - Total script fits within ${values.duration}s at ~2-3 words/second
 
-### JSON
-{ "variants": [...], "video_prompt": "...", "negative_prompt": "..." }`;
+### JSON Image
+{ "variants": [{"variant":1,"prompt":"...","negative_prompt":"..."},{"variant":2,...},...] }
+
+### JSON Video
+{ "scenes": [{"scene":1,"motion":"...","script":"..."},...],"duration":"${values.duration}s" }`;
 
     const userPrompt = `Generate 4 standalone UGC affiliate photo prompts + 1 video prompt.
 
@@ -413,39 +416,52 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
 }
 
 /**
- * Parse UGC output: Image Variants (1-4), Video Prompt, JSON.
+ * Parse UGC output: Image Variants (1-4), Video Prompt, JSON Image, JSON Video.
  */
-function parseUGCResult(raw: string): { images: string; video: string; json: string } {
+function parseUGCResult(raw: string): { images: string; video: string; jsonImage: string; jsonVideo: string } {
   const imageParts: string[] = [];
   const videoParts: string[] = [];
-  const jsonParts: string[] = [];
+  const jsonImageParts: string[] = [];
+  const jsonVideoParts: string[] = [];
 
   const imageRegex = /###?\s*IMAGE PROMPT VARIANT\s*\d+\s*\n([\s\S]*?)(?=###?\s*IMAGE PROMPT VARIANT|###?\s*VIDEO PROMPT|###?\s*JSON|$)/gi;
   const videoRegex = /###?\s*VIDEO PROMPT\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*IMAGE|$)/gi;
-  const jsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
+  const jsonImageRegex = /###?\s*JSON\s*(?:Image|Gambar)\s*\n([\s\S]*?)(?=###?\s*JSON\s*(?:Video)|###?\s*IMAGE|###?\s*VIDEO|$)/gi;
+  const jsonVideoRegex = /###?\s*JSON\s*(?:Video)\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
 
   let match;
   while ((match = imageRegex.exec(raw)) !== null) imageParts.push(match[1].trim());
   while ((match = videoRegex.exec(raw)) !== null) videoParts.push(match[1].trim());
-  while ((match = jsonRegex.exec(raw)) !== null) jsonParts.push(match[1].trim());
+  while ((match = jsonImageRegex.exec(raw)) !== null) jsonImageParts.push(match[1].trim());
+  while ((match = jsonVideoRegex.exec(raw)) !== null) jsonVideoParts.push(match[1].trim());
+
+  // Fallback: kalau AI output satu "### JSON" saja
+  if (jsonImageParts.length === 0 && jsonVideoParts.length === 0) {
+    const genericJsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
+    while ((match = genericJsonRegex.exec(raw)) !== null) {
+      jsonImageParts.push(match[1].trim());
+    }
+  }
 
   return {
     images: imageParts.length > 0 ? imageParts.map((p, i) => `── Variant ${i + 1} ──\n${p}`).join("\n\n") : raw,
     video: videoParts.length > 0 ? videoParts.join("\n\n") : "",
-    json: jsonParts.length > 0 ? jsonParts.join("\n\n") : "",
+    jsonImage: jsonImageParts.length > 0 ? jsonImageParts.join("\n\n") : "",
+    jsonVideo: jsonVideoParts.length > 0 ? jsonVideoParts.join("\n\n") : "",
   };
 }
 
 function UGCResultTabs({ result }: { result: string }) {
-  const [activeTab, setActiveTab] = useState<"images" | "video" | "json">("images");
+  const [activeTab, setActiveTab] = useState<"images" | "video" | "jsonImage" | "jsonVideo">("images");
   const [copiedTab, setCopiedTab] = useState(false);
 
   const parsed = parseUGCResult(result);
 
   const tabs = [
-    { id: "images" as const, label: "🖼️ Image Prompts (4)", content: parsed.images },
+    { id: "images" as const, label: "🖼️ Image Prompts", content: parsed.images },
     { id: "video" as const, label: "🎬 Video Prompt", content: parsed.video },
-    { id: "json" as const, label: "{ } JSON", content: parsed.json },
+    { id: "jsonImage" as const, label: "{ } JSON Image", content: parsed.jsonImage },
+    { id: "jsonVideo" as const, label: "{ } JSON Video", content: parsed.jsonVideo },
   ];
 
   const currentContent = tabs.find((t) => t.id === activeTab)?.content || result;
