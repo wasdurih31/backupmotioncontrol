@@ -64,18 +64,14 @@ export default function DashboardLayout({
   }, [router]);
 
   function handleLogoutClick() {
-    if (isGenerating) {
-      setShowLogoutConfirm(true);
-    } else {
-      executeLogout();
-    }
+    setShowLogoutConfirm(true);
   }
 
   async function executeLogout() {
     try {
       setShowLogoutConfirm(false);
       if (isGenerating) {
-        clearResult(); // Forcefully stop local polling/generation process
+        clearResult();
       }
       await fetch('/api/auth/logout', { method: 'POST' });
       router.push('/');
@@ -252,23 +248,25 @@ export default function DashboardLayout({
             <div className="absolute top-0 left-0 w-full h-1 bg-red-500/80" />
             <h3 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-red-400" />
-              Peringatan
+              Keluar dari akun?
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Proses generate video sedang berjalan. Jika Anda keluar sekarang, proses tersebut akan dihentikan secara paksa.
+              {isGenerating
+                ? "Proses generate video sedang berjalan. Jika Anda keluar, semua proses akan dihentikan dan dianggap gagal."
+                : "Apakah Anda yakin ingin keluar? Semua proses yang sedang berjalan akan dihentikan."}
             </p>
             <div className="flex gap-3 w-full">
               <button 
                 onClick={() => setShowLogoutConfirm(false)}
                 className="flex-1 py-2.5 rounded-lg border border-border bg-transparent hover:bg-white/5 transition-colors text-sm font-medium"
               >
-                Batalkan
+                Tidak, Tetap Login
               </button>
               <button 
                 onClick={executeLogout}
                 className="flex-1 py-2.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
               >
-                Tetap Keluar
+                Ya, Keluar
               </button>
             </div>
           </motion.div>
