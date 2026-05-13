@@ -226,30 +226,33 @@ export default function StoryboardUGCPage() {
     const systemPrompt = `You are a professional storyboard artist creating COMIC-GRID STORYBOARD SHEET images for UGC affiliate content.
 
 YOUR TASK:
-Create an IMAGE GENERATION PROMPT that produces a clean storyboard SHEET (comic-grid layout with caption area below each panel), NOT a video description.
+Create an IMAGE GENERATION PROMPT that produces a clean storyboard SHEET — comic-grid layout where each panel has a photograph AND a caption area below with scene label and description.
 
-Reference visual style of the output image:
+REFERENCE VISUAL STYLE of the output image:
 - Photo panels arranged in a clean grid (2x2 / 2x3 / 3x3 / 4x3 depending on scene count)
 - Each panel is a real photograph (smartphone UGC style)
-- Below each panel: a dedicated caption area with the scene label "Scene N" and a short description
-- Text stays OUTSIDE the photo frame — NEVER as overlay on the image
+- BELOW each photo panel there is a WHITE CAPTION AREA containing:
+  * Scene label like "Scene 1" in bold
+  * 2-3 line description in smaller text (scene details, shot type, lighting)
+- Captions are RENDERED AS TEXT in the caption area (NOT as overlay on the photo)
 - White/minimal background between panels, editorial magazine feel
 
-CRITICAL DO NOT USE — these trigger AI to render subtitles/overlays/poster designs:
+CAPTIONS ARE REQUIRED — storyboard must NOT be photos only. Every panel MUST have its caption block below.
+
+Caption placement rule:
+- Text is rendered OUTSIDE the photo (in the caption area below the panel)
+- Text is NOT overlay/subtitle on top of the photo
+- Font: clean sans-serif, dark text on white/light background
+
+CRITICAL DO NOT USE — trigger AI to render subtitles/TikTok overlays:
 - Spoken dialogue / quotation marks ("Wow terasa lembut!")
 - Screenplay terms: Hook, Problem, Solution, CTA, Goal, Result, Reaction
 - Metadata labels: GLOBAL STYLE:, CHARACTER LOCK:, PRODUCT LOCK:, Camera Angle:
-- Words like "subtitles", "caption", "text overlay" used in positive context
-- TikTok-style caption text
-
-USE INSTEAD — Pure visual description per scene:
-- Subject + action + camera framing + lighting
-- 1 short visual sentence per scene (10-25 words)
-- NO dialogue, NO quotes, NO spoken text
+- TikTok-style subtitle text burned onto the photo
 
 PRODUCT CONSISTENCY (CRITICAL):
-- DO NOT describe packaging (no "frosted jar", "white cap", "pink label")
-- ALWAYS use: "produk sesuai gambar referensi" / "produk dari gambar referensi"
+- DO NOT describe product packaging (no "frosted jar", "white cap")
+- ALWAYS use: "produk sesuai gambar referensi"
 
 CHARACTER CONSISTENCY:
 - Naturally repeat: "wanita yang sama", "model yang sama" across scenes
@@ -263,7 +266,6 @@ ${totalParts > 1 ? `
 MULTI-PART CONTINUATION:
 - Start subsequent parts with: "Lanjutan storyboard sebelumnya dengan wanita yang sama dan produk dari gambar referensi yang sama."
 - Same visual style, same environment, same mood
-- DO NOT restart from scratch
 ` : ""}
 CAMERA STYLE: ${cameraStyle}
 ENVIRONMENT: ${env}
@@ -273,18 +275,18 @@ OUTPUT FORMAT (markdown, for EACH part):
 ## Prompt Part [N]
 
 ### Storyboard Prompt
-Create a clean UGC storyboard comic grid layout.
-Arrange all scenes in a [GRID] storyboard grid.
-Each frame should contain: visual image panel + dedicated caption area below the frame.
-Text must stay outside image frames. Do not place subtitles or overlay text directly on images.
-Use realistic smartphone photography style, natural lighting, authentic social media aesthetic, ${cameraStyle}.
+Create a clean UGC storyboard sheet with a [GRID] comic-grid layout.
+Layout: each panel = rectangular photo on top + white caption area below with "Scene N" bold label and 2-3 line description in smaller text. Captions are REQUIRED under every panel. Text is rendered in the caption area only, NOT as overlay on the photo. Editorial magazine style, minimalist typography, clean spacing.
+Photography style: realistic smartphone UGC photography, natural lighting, authentic social media aesthetic, ${cameraStyle}.
 Setting: ${env}.
 
-Scene 1: [wanita yang sama + action + framing + lighting]
+Scene 1: [wanita yang sama + action + framing + lighting, 10-25 words, pure visual description, no dialogue]
 Scene 2: [wanita yang sama + action + framing + lighting]
 ...
 
-Negative prompt: no subtitles, no text overlay, no infographic design, no poster layout, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
+Render each "Scene N: ..." as the caption text below its respective photo panel.
+
+Negative prompt: no subtitles on photo, no text overlay on image, no tiktok caption, no infographic design, no poster design, no watermark, distorted face, extra fingers, blurry product, CGI skin, plastic skin, over cinematic lighting
 
 ### Video Prompt
 [1 short natural paragraph describing the ${duration}s video motion/pacing, no labels, duration-aware${values.scriptMode === "manual" && values.manualScript ? `. Incorporate voiceover: "${values.manualScript}"` : ""}]
@@ -292,7 +294,7 @@ Negative prompt: no subtitles, no text overlay, no infographic design, no poster
 ### JSON
 { "part": N, "layout": "GRID", "scenes": [...], "negative_prompt": "..." }
 
-For this part, use grid size matching the number of scenes in the part (${chunks.map((c, i) => `Part ${i + 1}: ${gridFor(c.end - c.start + 1)}`).join(", ")}).`;
+For this part, use grid size: ${chunks.map((c, i) => `Part ${i + 1} = ${gridFor(c.end - c.start + 1)}`).join(", ")}.`;
 
     const userPrompt = `Generate a ${sceneCount}-scene UGC storyboard sheet for a ${duration}s TikTok affiliate video.
 Split into ${totalParts} part(s): ${chunkInfo}
