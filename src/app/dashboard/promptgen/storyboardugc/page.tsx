@@ -54,6 +54,14 @@ const schema = z.object({
   duration: z.string().min(1),
   scriptMode: z.string().min(1),
   manualScript: z.string().optional(),
+}).refine((data) => {
+  if (data.useManualEnv && (!data.manualEnv || data.manualEnv.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Latar belakang manual wajib diisi",
+  path: ["manualEnv"],
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -345,8 +353,11 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                     </label>
                   </div>
                   {useManualEnv ? (
-                    <FormField control={form.control} name="manualEnv" render={({ field }) => (
-                      <FormItem><FormControl><Input placeholder="Tulis latar belakang custom..." {...field} className="bg-black/20 border-border/40" /></FormControl></FormItem>
+                    <FormField control={form.control} name="manualEnv" render={({ field, fieldState }) => (
+                      <FormItem>
+                        <FormControl><Input placeholder="Wajib diisi. Contoh: Kamar tidur minimalis dengan cahaya jendela pagi" {...field} className={`bg-black/20 border-border/40 ${fieldState.error ? "border-red-500/50" : ""}`} /></FormControl>
+                        {fieldState.error && <p className="text-[11px] text-red-400 mt-1">{fieldState.error.message}</p>}
+                      </FormItem>
                     )} />
                   ) : (
                     <FormField control={form.control} name="environment" render={({ field }) => (
