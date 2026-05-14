@@ -131,25 +131,25 @@ function ResultTabs({ result }: { result: string }) {
   };
 
   return (
-    <Card className="bg-card/30 border-green-500/20">
+    <Card className="bg-[#1A1A1A] border border-[#333333]">
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between mb-3">
-          <CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-400" />Hasil Generate</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-white" />Hasil Generate</CardTitle>
           <Button variant="outline" size="sm" onClick={handleCopyTab} className="gap-1.5 text-xs">
-            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
             {copiedTab ? "Copied!" : "Copy"}
           </Button>
         </div>
-        <div className="flex gap-1 border-b border-border/30 -mx-6 px-6 overflow-x-auto">
+        <div className="flex gap-1 border-b border-[#333333] -mx-6 px-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? "border-blue-500 text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? "border-white text-white" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >{tab.label}</button>
           ))}
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        <div className="bg-black/40 rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+        <div className="bg-[#0D0D0D] border border-[#333333] rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
           {currentContent ? <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{currentContent}</pre>
             : <p className="text-xs text-muted-foreground italic text-center py-8">Section tidak ditemukan. Coba generate ulang.</p>}
         </div>
@@ -293,13 +293,13 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
       <div className="flex items-center gap-3">
         <Link href="/dashboard/promptgen"><Button variant="ghost" size="icon" className="shrink-0"><ArrowLeft className="w-5 h-5" /></Button></Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Film className="w-6 h-6 text-blue-400" />Storyboard UGC</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Film className="w-6 h-6 text-white" />Storyboard UGC</h1>
           <p className="text-sm text-muted-foreground">Generate storyboard prompt untuk affiliate content</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card/30 border-border/50">
+        <Card className="bg-[#1A1A1A] border border-[#333333]">
           <CardContent className="pt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -309,7 +309,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                     <FormLabel className="text-xs">AI Model</FormLabel>
                     <Select value={`${form.getValues("provider")}|${form.getValues("model")}`}
                       onValueChange={(v) => { const parts = (v || "").split("|"); form.setValue("provider", parts[0] || "openrouter"); form.setValue("model", parts[1] || "auto-free"); }}>
-                      <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>{MODEL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </FormItem>
@@ -318,7 +318,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                 {/* Nama Produk */}
                 <FormField control={form.control} name="productName" render={({ field }) => (
                   <FormItem><FormLabel className="text-xs">Nama Produk *</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Glad2Glow Peeling Gel" {...field} className="bg-black/20 border-border/40" /></FormControl>
+                    <FormControl><Input placeholder="Contoh: Glad2Glow Peeling Gel" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
                   </FormItem>
                 )} />
 
@@ -327,7 +327,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="productCategory" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Kategori</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
@@ -335,7 +335,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="contentStyle" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Content Style</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{CONTENT_STYLES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
@@ -355,7 +355,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   {useManualEnv ? (
                     <FormField control={form.control} name="manualEnv" render={({ field, fieldState }) => (
                       <FormItem>
-                        <FormControl><Input placeholder="Wajib diisi. Contoh: Kamar tidur minimalis dengan cahaya jendela pagi" {...field} className={`bg-black/20 border-border/40 ${fieldState.error ? "border-red-500/50" : ""}`} /></FormControl>
+                        <FormControl><Input placeholder="Wajib diisi. Contoh: Kamar tidur minimalis dengan cahaya jendela pagi" {...field} className={`bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm ${fieldState.error ? "border-red-500/50" : ""}`} /></FormControl>
                         {fieldState.error && <p className="text-[11px] text-red-400 mt-1">{fieldState.error.message}</p>}
                       </FormItem>
                     )} />
@@ -363,7 +363,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                     <FormField control={form.control} name="environment" render={({ field }) => (
                       <FormItem>
                         <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>{ENVIRONMENTS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
                         </Select>
                       </FormItem>
@@ -376,7 +376,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="cameraDevice" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Device Camera</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{ALL_DEVICES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
@@ -384,7 +384,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="sceneCount" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Jumlah Scene</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{SCENE_COUNTS.map((s) => <SelectItem key={s} value={s}>{s} scene</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
@@ -393,8 +393,8 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
 
                 {/* Chunking preview */}
                 {previewChunks.length > 1 && (
-                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2.5 text-[11px] text-blue-300/80">
-                    <span className="font-bold text-blue-300">Auto-split:</span>{" "}
+                  <div className="bg-[#1A1A1A] border border-[#333333] rounded-lg p-2.5 text-[11px] text-white/70">
+                    <span className="font-bold text-white">Auto-split:</span>{" "}
                     {previewChunks.map((c, i) => `Part ${i + 1} (Scene ${c.start}-${c.end})`).join(" → ")}
                   </div>
                 )}
@@ -404,7 +404,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="duration" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Durasi Video</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>{DURATIONS.map((d) => <SelectItem key={d} value={d}>{d} detik</SelectItem>)}</SelectContent>
                       </Select>
                     </FormItem>
@@ -412,7 +412,7 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                   <FormField control={form.control} name="scriptMode" render={({ field }) => (
                     <FormItem><FormLabel className="text-xs">Script / Voice Over</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="auto">Auto AI Script</SelectItem>
                           <SelectItem value="manual">Manual Script</SelectItem>
@@ -435,13 +435,13 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
                     </div>
                     <FormField control={form.control} name="manualScript" render={({ field }) => (
                       <FormItem><FormLabel className="text-xs">Voice Over Script</FormLabel>
-                        <FormControl><Textarea placeholder="Contoh: Aduh kenapa kulit aku akhir-akhir ini kering banget sih. Padahal udah pakai skincare tapi masih terasa kasar..." {...field} className="bg-black/20 border-border/40 h-28" /></FormControl>
+                        <FormControl><Textarea placeholder="Contoh: Aduh kenapa kulit aku akhir-akhir ini kering banget sih. Padahal udah pakai skincare tapi masih terasa kasar..." {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm h-28" /></FormControl>
                       </FormItem>
                     )} />
                   </div>
                 )}
 
-                <Button type="submit" disabled={isGenerating} className="w-full bg-blue-600 hover:bg-blue-500 h-11 gap-2">
+                <Button type="submit" disabled={isGenerating} className="w-full bg-white text-black hover:bg-white/90 font-semibold h-11 gap-2">
                   {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Storyboard</>}
                 </Button>
               </form>
@@ -452,10 +452,10 @@ Write in Bahasa Indonesia. Generate ALL parts in exact format above.`;
         {/* Result */}
         <div className="space-y-4">
           {isGenerating && (
-            <Card className="bg-card/30 border-blue-500/20 animate-pulse">
+            <Card className="bg-[#1A1A1A] border border-[#333333] animate-pulse">
               <CardContent className="flex items-center justify-center h-64">
                 <div className="text-center space-y-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-400 mx-auto" />
+                  <Loader2 className="w-8 h-8 animate-spin text-white mx-auto" />
                   <p className="text-sm text-muted-foreground">AI sedang membuat storyboard...</p>
                 </div>
               </CardContent>

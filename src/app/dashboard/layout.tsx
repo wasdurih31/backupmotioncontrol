@@ -98,7 +98,7 @@ export default function DashboardLayout({
       <header className="hidden md:flex h-16 border-b border-border/50 bg-card/20 backdrop-blur-xl items-center justify-between px-8 z-50 shrink-0">
         <div className="flex items-center gap-12">
           <Link href="/dashboard" className="font-bold text-lg tracking-tight shrink-0 flex flex-col">
-            <div>UniverseAI <span className="text-muted-foreground">MC</span></div>
+            <div>UniverseAI <span className="text-muted-foreground">Studio</span></div>
             <span className="text-[10px] text-muted-foreground/70 -mt-1 font-normal tracking-normal">
               {process.env.NEXT_PUBLIC_SITE_TYPE === 'BACKUP' ? 'Backup v1.0' : 'Main v1.0'}
             </span>
@@ -165,7 +165,7 @@ export default function DashboardLayout({
       {/* --- MOBILE TOPBAR --- */}
       <header className="flex md:hidden h-14 border-b border-border/50 bg-background/80 backdrop-blur-xl items-center justify-between px-4 z-10 shrink-0">
         <Link href="/dashboard" className="font-bold text-base tracking-tight flex flex-col">
-          <div>UniverseAI <span className="text-muted-foreground">MC</span></div>
+          <div>UniverseAI <span className="text-muted-foreground">Studio</span></div>
           <span className="text-[9px] text-muted-foreground/70 -mt-1 font-normal tracking-normal">
             {process.env.NEXT_PUBLIC_SITE_TYPE === 'BACKUP' ? 'Backup v1.0' : 'Main v1.0'}
           </span>

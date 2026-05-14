@@ -221,7 +221,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
         </Link>
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShoppingBag className="w-6 h-6 text-green-400" />
+            <ShoppingBag className="w-6 h-6 text-white" />
             UGC Affiliate
           </h1>
           <p className="text-sm text-muted-foreground">Generate 4 variasi prompt gambar + video prompt</p>
@@ -229,7 +229,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card/30 border-border/50">
+        <Card className="bg-[#1A1A1A] border border-[#333333]">
           <CardHeader className="pb-4">
             <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Settings</CardTitle>
           </CardHeader>
@@ -249,7 +249,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                         }
                       }}
                     >
-                      <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         {MODEL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                       </SelectContent>
@@ -260,7 +260,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                 <FormField control={form.control} name="productName" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Nama Produk *</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Wardah UV Shield" {...field} className="bg-black/20 border-border/40" /></FormControl>
+                    <FormControl><Input placeholder="Contoh: Wardah UV Shield" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
                   </FormItem>
                 )} />
 
@@ -269,7 +269,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Kategori</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="beauty">Beauty</SelectItem>
                           <SelectItem value="fashion">Fashion</SelectItem>
@@ -285,7 +285,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Content Style</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           {CONTENT_STYLES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                         </SelectContent>
@@ -299,7 +299,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Environment</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           {ALL_ENVS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                         </SelectContent>
@@ -311,7 +311,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Camera Device</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           {ALL_DEVICES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
@@ -323,7 +323,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                 <FormField control={form.control} name="customEnvironment" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Custom Environment (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Deskripsi background custom..." {...field} className="bg-black/20 border-border/40" /></FormControl>
+                    <FormControl><Input placeholder="Deskripsi background custom..." {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
                   </FormItem>
                 )} />
 
@@ -332,7 +332,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Durasi Video (s)</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           {DURATIONS.map((d) => <SelectItem key={d} value={d}>{d}s</SelectItem>)}
                         </SelectContent>
@@ -344,7 +344,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                     <FormItem>
                       <FormLabel className="text-xs">Video Model</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                         <SelectContent>
                           {VIDEO_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                         </SelectContent>
@@ -357,7 +357,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                   <FormItem>
                     <FormLabel className="text-xs">Script Mode</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="bg-black/20 border-border/40"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="auto">Auto AI Script</SelectItem>
                         <SelectItem value="manual">Manual Script</SelectItem>
@@ -370,7 +370,7 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                   <FormField control={form.control} name="manualScript" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs">Manual Script</FormLabel>
-                      <FormControl><Textarea placeholder="Tulis script kamu..." {...field} className="bg-black/20 border-border/40 h-20" /></FormControl>
+                      <FormControl><Textarea placeholder="Tulis script kamu..." {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm h-20" /></FormControl>
                     </FormItem>
                   )} />
                 )}
@@ -378,18 +378,18 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
                 <FormField control={form.control} name="characterDesc" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Deskripsi Karakter (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Wanita Asia, rambut panjang, 22 tahun" {...field} className="bg-black/20 border-border/40" /></FormControl>
+                    <FormControl><Input placeholder="Contoh: Wanita Asia, rambut panjang, 22 tahun" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
                   </FormItem>
                 )} />
 
                 <FormField control={form.control} name="productDesc" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Deskripsi Produk (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Tube pink 30ml, label gold" {...field} className="bg-black/20 border-border/40" /></FormControl>
+                    <FormControl><Input placeholder="Contoh: Tube pink 30ml, label gold" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
                   </FormItem>
                 )} />
 
-                <Button type="submit" disabled={isGenerating} className="w-full bg-green-600 hover:bg-green-500 h-11 gap-2">
+                <Button type="submit" disabled={isGenerating} className="w-full bg-white text-black hover:bg-white/90 font-semibold h-11 gap-2">
                   {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><ShoppingBag className="w-4 h-4" /> Generate UGC Prompts</>}
                 </Button>
               </form>
@@ -400,10 +400,10 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
         {/* Result */}
         <div className="space-y-4">
           {isGenerating && (
-            <Card className="bg-card/30 border-green-500/20 animate-pulse">
+            <Card className="bg-[#1A1A1A] border border-[#333333] animate-pulse">
               <CardContent className="flex items-center justify-center h-64">
                 <div className="text-center space-y-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-green-400 mx-auto" />
+                  <Loader2 className="w-8 h-8 animate-spin text-white mx-auto" />
                   <p className="text-sm text-muted-foreground">AI sedang membuat variasi prompt...</p>
                 </div>
               </CardContent>
@@ -476,19 +476,19 @@ function UGCResultTabs({ result }: { result: string }) {
   };
 
   return (
-    <Card className="bg-card/30 border-green-500/20">
+    <Card className="bg-[#1A1A1A] border border-[#333333]">
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between mb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <CheckCircle2 className="w-4 h-4 text-white" />
             Hasil Generate
           </CardTitle>
           <Button variant="outline" size="sm" onClick={handleCopyTab} className="gap-1.5 text-xs">
-            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
             {copiedTab ? "Copied!" : "Copy"}
           </Button>
         </div>
-        <div className="flex gap-1 border-b border-border/30 -mx-6 px-6">
+        <div className="flex gap-1 border-b border-[#333333] -mx-6 px-6">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -496,7 +496,7 @@ function UGCResultTabs({ result }: { result: string }) {
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? "border-green-500 text-green-400"
+                  ? "border-white text-white"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -506,7 +506,7 @@ function UGCResultTabs({ result }: { result: string }) {
         </div>
       </CardHeader>
       <CardContent className="pt-4">
-        <div className="bg-black/40 rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+        <div className="bg-[#0D0D0D] border border-[#333333] rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
           {currentContent ? (
             <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{currentContent}</pre>
           ) : (

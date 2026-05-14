@@ -78,7 +78,7 @@ export default function LoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground">Sign in to your UniverseAI MC account</p>
+          <p className="text-muted-foreground">Sign in to your UniverseAI Studio account</p>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-2xl">

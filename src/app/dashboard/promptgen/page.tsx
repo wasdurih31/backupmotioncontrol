@@ -10,16 +10,16 @@ const activeMenus = [
     description: "Generate storyboard prompt untuk affiliate content. Multi-scene, duration-aware, character consistent.",
     href: "/dashboard/promptgen/storyboardugc",
     icon: Film,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10 border-blue-500/20",
+    color: "text-white",
+    bgColor: "border-[#333333] bg-[#1A1A1A] hover:bg-[#262626]",
   },
   {
     title: "UGC Affiliate",
     description: "Generate 4 variasi prompt gambar + video prompt untuk single-shot affiliate content.",
     href: "/dashboard/promptgen/ugcaffiliate",
     icon: ShoppingBag,
-    color: "text-green-400",
-    bgColor: "bg-green-500/10 border-green-500/20",
+    color: "text-white",
+    bgColor: "border-[#333333] bg-[#1A1A1A] hover:bg-[#262626]",
   },
 ];
 
@@ -35,7 +35,7 @@ export default function PromptGenPage() {
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <Sparkles className="w-8 h-8 text-blue-400" />
+          <Sparkles className="w-8 h-8 text-white" />
           Prompt Generator Suite
         </h1>
         <p className="text-muted-foreground">
@@ -47,7 +47,7 @@ export default function PromptGenPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {activeMenus.map((menu) => (
           <Link key={menu.title} href={menu.href}>
-            <Card className={`h-full border ${menu.bgColor} hover:bg-white/5 transition-all cursor-pointer group`}>
+            <Card className={`h-full border ${menu.bgColor} transition-all cursor-pointer group`}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-3 text-lg">
                   <menu.icon className={`w-6 h-6 ${menu.color}`} />

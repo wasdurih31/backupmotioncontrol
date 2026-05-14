@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UniverseAI MC | Premium Video Generator",
+  title: "UniverseAI Studio | Premium Video Generator",
   description: "Generate cinematic AI motion videos using your own Freepik API key.",
 };
 

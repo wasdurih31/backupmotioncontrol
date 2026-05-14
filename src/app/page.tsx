@@ -31,7 +31,7 @@ export default function Home() {
             Kling v2.6 Integration
           </div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground">
-            UniverseAI <span className="text-muted-foreground">MC</span>
+            UniverseAI <span className="text-muted-foreground">Studio</span>
           </h1>
           <p className="text-2xl md:text-3xl font-medium text-foreground mt-2">
             Motion Control Video Generator
@@ -78,7 +78,7 @@ export default function Home() {
       </main>
 
       <footer className="w-full py-6 text-center text-sm text-muted-foreground border-t border-border/50 mt-auto z-10">
-        UniverseAI MC &copy; 2026
+        UniverseAI Studio &copy; 2026
       </footer>
     </div>
   );
