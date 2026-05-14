@@ -246,8 +246,8 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             {/* AI Model */}
             <div><label className={labelClass}>AI Model</label>
-              <select className={selectClass} value={`${form.getValues("provider")}|${form.getValues("model")}`}
-                onChange={(e) => { const [p, m] = e.target.value.split("|"); form.setValue("provider", p); form.setValue("model", m); }}>
+              <select className={selectClass} value={`${form.watch("provider")}|${form.watch("model")}`}
+                onChange={(e) => { const parts = e.target.value.split("|"); form.setValue("provider", parts[0]); form.setValue("model", parts[1]); }}>
                 {MODEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
