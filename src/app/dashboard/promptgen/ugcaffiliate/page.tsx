@@ -4,26 +4,19 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Copy, CheckCircle2, ArrowLeft, ShoppingBag } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
 const MODEL_OPTIONS = [
-  { value: "openrouter|auto-free", label: "Auto Free (OpenRouter)", provider: "openrouter", model: "auto-free" },
-  { value: "openrouter|gemma-4-26b", label: "Gemma 4 26B (Free)", provider: "openrouter", model: "gemma-4-26b" },
-  { value: "groq|llama-4-scout", label: "Llama 4 Scout (Free)", provider: "groq", model: "llama-4-scout" },
-  { value: "groq|llama-4-maverick", label: "Llama 4 Maverick (Free)", provider: "groq", model: "llama-4-maverick" },
-  { value: "google|gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (BYOK)", provider: "google", model: "gemini-3.1-flash-lite" },
-  { value: "google|gemini-3-flash-preview", label: "Gemini 3 Flash Preview (BYOK)", provider: "google", model: "gemini-3-flash-preview" },
-  { value: "google|gemini-2.5-flash", label: "Gemini 2.5 Flash (BYOK)", provider: "google", model: "gemini-2.5-flash" },
+  { value: "openrouter|auto-free", label: "Auto Free (OpenRouter)" },
+  { value: "openrouter|gemma-4-26b", label: "Gemma 4 26B (Free)" },
+  { value: "groq|llama-4-scout", label: "Llama 4 Scout (Free)" },
+  { value: "groq|llama-4-maverick", label: "Llama 4 Maverick (Free)" },
+  { value: "google|gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite (BYOK)" },
+  { value: "google|gemini-3-flash-preview", label: "Gemini 3 Flash Preview (BYOK)" },
+  { value: "google|gemini-2.5-flash", label: "Gemini 2.5 Flash (BYOK)" },
 ];
-
 const CONTENT_STYLES = ["Soft Sell", "Problem Solution", "Beauty Creator", "Testimonial"];
 const BEAUTY_ENVS = ["Bathroom Mirror", "Bedroom Natural Light", "Vanity Table", "Luxury Hotel Bathroom", "Minimalist Room"];
 const FASHION_ENVS = ["Cafe Lifestyle", "City Walk", "Bedroom Mirror", "Rooftop Casual", "Shopping Mall"];
@@ -32,52 +25,51 @@ const CASUAL_DEVICES = ["iPhone 13", "iPhone 15 Pro", "iPhone 16 Pro", "Samsung 
 const PRO_DEVICES = ["Sony A7S III", "Sony FX3", "Canon R5", "Fujifilm XT5"];
 const ALL_DEVICES = [...CASUAL_DEVICES, ...PRO_DEVICES];
 const DURATIONS = ["5", "6", "8", "10", "15"];
+const WORD_LIMITS: Record<string, string> = { "5": "15-20", "6": "15-20", "8": "20-35", "10": "35-50", "15": "50-80" };
 const VIDEO_MODELS = ["Veo 3.1 (8s)", "Seedance 2 (5-15s)", "Grok AI (6-10s)", "Sora 2 (12s)"];
 
 const schema = z.object({
-  provider: z.string().min(1),
-  model: z.string().min(1),
+  provider: z.string(),
+  model: z.string(),
   productName: z.string().min(1, "Nama produk wajib diisi"),
-  productCategory: z.string().min(1, "Kategori wajib dipilih"),
-  contentStyle: z.string().min(1, "Pilih content style"),
-  environment: z.string().min(1, "Pilih environment"),
-  customEnvironment: z.string().optional(),
-  cameraDevice: z.string().min(1, "Pilih camera device"),
-  duration: z.string().min(1, "Pilih durasi"),
-  videoModel: z.string().min(1, "Pilih video model"),
+  productCategory: z.string(),
+  contentStyle: z.string(),
+  environment: z.string(),
+  manualEnv: z.string().optional(),
+  useManualEnv: z.boolean().optional(),
+  cameraDevice: z.string(),
+  duration: z.string(),
+  videoModel: z.string(),
   characterDesc: z.string().optional(),
   productDesc: z.string().optional(),
-  scriptMode: z.string().min(1, "Pilih mode script"),
+  scriptMode: z.string(),
   manualScript: z.string().optional(),
-});
+}).refine((d) => !(d.useManualEnv && (!d.manualEnv || !d.manualEnv.trim())), { message: "Latar belakang wajib diisi", path: ["manualEnv"] });
 
-type FormValues = z.infer<typeof schema>;
+type FV = z.infer<typeof schema>;
 
-export default function UGCAffiliatePageComponent() {
+export default function UGCAffiliatePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"images" | "video" | "jsonImage" | "jsonVideo">("images");
+  const [copied, setCopied] = useState(false);
 
-  const form = useForm<FormValues>({
+  const form = useForm<FV>({
     resolver: zodResolver(schema),
     defaultValues: {
-      provider: "openrouter",
-      model: "auto-free",
-      productName: "",
-      productCategory: "beauty",
-      contentStyle: "Soft Sell",
-      environment: "Bedroom Natural Light",
-      customEnvironment: "",
-      cameraDevice: "iPhone 15 Pro",
-      duration: "8",
-      videoModel: "Veo 3.1 (8s)",
-      characterDesc: "",
-      productDesc: "",
-      scriptMode: "auto",
-      manualScript: "",
+      provider: "openrouter", model: "auto-free", productName: "", productCategory: "beauty",
+      contentStyle: "Soft Sell", environment: "Bedroom Natural Light", manualEnv: "",
+      useManualEnv: false, cameraDevice: "iPhone 15 Pro", duration: "8",
+      videoModel: "Veo 3.1 (8s)", characterDesc: "", productDesc: "",
+      scriptMode: "auto", manualScript: "",
     },
   });
 
-  async function onSubmit(values: FormValues) {
+  const useManualEnv = form.watch("useManualEnv");
+  const scriptMode = form.watch("scriptMode");
+  const duration = form.watch("duration");
+
+  async function onSubmit(values: FV) {
     setIsGenerating(true);
     setResult(null);
 
@@ -85,7 +77,7 @@ export default function UGCAffiliatePageComponent() {
     const cameraStyle = isSmartphone
       ? "smartphone realism, social media exposure, front camera feel"
       : "cinematic depth of field, professional lighting response";
-    const env = values.customEnvironment?.trim() || values.environment;
+    const env = values.useManualEnv && values.manualEnv?.trim() ? values.manualEnv.trim() : values.environment;
 
     const systemPrompt = `You are a professional storyboard artist creating UGC AFFILIATE IMAGE PROMPTS for TikTok/Shopee.
 
@@ -195,327 +187,236 @@ Generate all 4 image variants + video prompt + JSON in the exact output format.`
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ systemPrompt, userPrompt, provider: values.provider, model: values.model }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Gagal generate prompt");
-        return;
-      }
-
+      if (!res.ok) { toast.error(data.error || "Gagal generate prompt"); return; }
       setResult(data.result);
-      toast.success("Prompt berhasil di-generate!");
-    } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan");
-    } finally {
-      setIsGenerating(false);
-    }
+      toast.success("Prompt berhasil!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally { setIsGenerating(false); }
   }
 
+  // Parse result into tabs
+  function getSection(key: string): string {
+    if (!result) return "";
+    const regexMap: Record<string, RegExp> = {
+      images: /###?\s*IMAGE PROMPT VARIANT\s*\d+\s*\n([\s\S]*?)(?=###?\s*IMAGE PROMPT VARIANT|###?\s*VIDEO PROMPT|###?\s*JSON|$)/gi,
+      video: /###?\s*VIDEO PROMPT\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*IMAGE|$)/gi,
+      jsonImage: /###?\s*JSON\s*(?:Image|Gambar)\s*\n([\s\S]*?)(?=###?\s*JSON\s*(?:Video)|###?\s*IMAGE|###?\s*VIDEO|$)/gi,
+      jsonVideo: /###?\s*JSON\s*(?:Video)\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi,
+    };
+    const re = regexMap[key];
+    if (!re) return result;
+    const parts: string[] = [];
+    let m;
+    while ((m = re.exec(result)) !== null) parts.push(m[1].trim());
+    if (parts.length === 0 && key === "images") return result;
+    if (key === "images" && parts.length > 0) {
+      return parts.map((p, i) => `── Variant ${i + 1} ──\n${p}`).join("\n\n");
+    }
+    return parts.length > 0 ? parts.join("\n\n---\n\n") : "";
+  }
+
+  const currentContent = getSection(activeTab);
+  const handleCopy = () => { navigator.clipboard.writeText(currentContent); setCopied(true); toast.success("Copied!"); setTimeout(() => setCopied(false), 2000); };
+
+  const selectClass = "w-full bg-[#141414] border border-[#333] text-[#e5e5e5] font-mono text-sm px-4 py-3.5 rounded-lg focus:border-white focus:ring-1 focus:ring-white transition-all appearance-none outline-none";
+  const inputClass = "w-full bg-[#141414] border border-[#333] text-[#e5e5e5] font-mono text-sm px-4 py-3.5 rounded-lg focus:border-white focus:ring-1 focus:ring-white transition-all outline-none placeholder:text-[#555]";
+  const labelClass = "text-[11px] font-semibold tracking-[0.05em] text-[#a3a3a3] uppercase block mb-2";
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/promptgen">
-          <Button variant="ghost" size="icon" className="shrink-0">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+    <div className="min-h-screen pb-24">
+      {/* Back button */}
+      <div className="mb-8">
+        <Link href="/dashboard/promptgen" className="inline-flex items-center gap-2 text-[#a3a3a3] hover:text-white transition-colors text-sm">
+          <ArrowLeft className="w-4 h-4" /> Back
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShoppingBag className="w-6 h-6 text-white" />
-            UGC Affiliate
-          </h1>
-          <p className="text-sm text-muted-foreground">Generate 4 variasi prompt gambar + video prompt</p>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-[#1A1A1A] border border-[#333333]">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField control={form.control} name="model" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">AI Model</FormLabel>
-                    <Select
-                      value={`${form.getValues("provider")}|${form.getValues("model")}`}
-                      onValueChange={(val) => {
-                        const opt = MODEL_OPTIONS.find((o) => o.value === val);
-                        if (opt) {
-                          form.setValue("provider", opt.provider);
-                          form.setValue("model", opt.model);
-                        }
-                      }}
-                    >
-                      <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {MODEL_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+        {/* Left: Form */}
+        <section className="lg:col-span-5 flex flex-col gap-8">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-semibold text-white mb-3 tracking-tight flex items-center gap-3">
+              <ShoppingBag className="w-8 h-8 text-white" /> UGC Affiliate
+            </h1>
+            <p className="text-sm text-[#a3a3a3] leading-relaxed">Generate 4 variasi prompt gambar + video prompt untuk TikTok affiliate.</p>
+          </div>
 
-                <FormField control={form.control} name="productName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Nama Produk *</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Wardah UV Shield" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
-                  </FormItem>
-                )} />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            {/* AI Model */}
+            <div><label className={labelClass}>AI Model</label>
+              <select className={selectClass} value={`${form.getValues("provider")}|${form.getValues("model")}`}
+                onChange={(e) => { const [p, m] = e.target.value.split("|"); form.setValue("provider", p); form.setValue("model", m); }}>
+                {MODEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="productCategory" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Kategori</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="beauty">Beauty</SelectItem>
-                          <SelectItem value="fashion">Fashion</SelectItem>
-                          <SelectItem value="food">Food</SelectItem>
-                          <SelectItem value="tech">Tech</SelectItem>
-                          <SelectItem value="lifestyle">Lifestyle</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+            {/* Product Name */}
+            <div><label className={labelClass}>Product Name</label>
+              <input className={inputClass} placeholder="e.g. Wardah UV Shield" {...form.register("productName")} />
+              {form.formState.errors.productName && <p className="text-red-400 text-xs mt-1">{form.formState.errors.productName.message}</p>}
+            </div>
 
-                  <FormField control={form.control} name="contentStyle" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Content Style</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {CONTENT_STYLES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+            {/* Category + Content Style */}
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={labelClass}>Category</label>
+                <select className={selectClass} {...form.register("productCategory")}>
+                  <option value="beauty">Beauty</option>
+                  <option value="fashion">Fashion</option>
+                  <option value="food">Food</option>
+                  <option value="tech">Tech</option>
+                  <option value="lifestyle">Lifestyle</option>
+                </select>
+              </div>
+              <div><label className={labelClass}>Content Style</label>
+                <select className={selectClass} {...form.register("contentStyle")}>
+                  {CONTENT_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Background */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-semibold tracking-[0.05em] text-[#a3a3a3] uppercase">Background</label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-[10px] text-[#666]">Manual</span>
+                  <input type="checkbox" className="w-3.5 h-3.5 rounded accent-white bg-[#141414] border-[#333]"
+                    checked={!!useManualEnv} onChange={(e) => form.setValue("useManualEnv", e.target.checked)} />
+                </label>
+              </div>
+              {useManualEnv ? (
+                <input className={inputClass} placeholder="Wajib diisi. Contoh: Kamar tidur minimalis, cahaya jendela pagi" {...form.register("manualEnv")} />
+              ) : (
+                <select className={selectClass} {...form.register("environment")}>
+                  {ALL_ENVS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+              )}
+              {form.formState.errors.manualEnv && <p className="text-red-400 text-xs mt-1">{form.formState.errors.manualEnv.message}</p>}
+            </div>
+
+            {/* Camera + Video Model */}
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={labelClass}>Device Camera</label>
+                <select className={selectClass} {...form.register("cameraDevice")}>
+                  {ALL_DEVICES.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div><label className={labelClass}>Video Model</label>
+                <select className={selectClass} {...form.register("videoModel")}>
+                  {VIDEO_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Duration + Script */}
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className={labelClass}>Duration</label>
+                <select className={selectClass} {...form.register("duration")}>
+                  {DURATIONS.map((d) => <option key={d} value={d}>{d} Seconds</option>)}
+                </select>
+              </div>
+              <div><label className={labelClass}>Script</label>
+                <select className={selectClass} {...form.register("scriptMode")}>
+                  <option value="auto">Auto AI Script</option>
+                  <option value="manual">Manual Script</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Manual Script */}
+            {scriptMode === "manual" && (
+              <div className="space-y-2">
+                <div className="bg-[#141414] border border-[#333] rounded-lg px-4 py-3 text-[11px] text-[#a3a3a3]">
+                  <span className="text-white font-medium">Durasi {duration}s</span> → gunakan sekitar <span className="text-white font-medium">{WORD_LIMITS[duration] || "35-50"} kata</span>. Pace: ~2-3 kata/detik.
                 </div>
+                <textarea className={`${inputClass} h-28 resize-none`} placeholder="Contoh: Aduh kenapa kulit aku akhir-akhir ini kering banget sih..." {...form.register("manualScript")} />
+              </div>
+            )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="environment" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Environment</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {ALL_ENVS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+            {/* Character Desc (optional) */}
+            <div><label className={labelClass}>Character (optional)</label>
+              <input className={inputClass} placeholder="e.g. Wanita Asia, rambut panjang, 22 tahun" {...form.register("characterDesc")} />
+            </div>
 
-                  <FormField control={form.control} name="cameraDevice" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Camera Device</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {ALL_DEVICES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                </div>
+            {/* Product Desc (optional) */}
+            <div><label className={labelClass}>Product Notes (optional)</label>
+              <input className={inputClass} placeholder="e.g. Tube pink 30ml, label gold (context only)" {...form.register("productDesc")} />
+            </div>
 
-                <FormField control={form.control} name="customEnvironment" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Custom Environment (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Deskripsi background custom..." {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
-                  </FormItem>
-                )} />
+            {/* Submit */}
+            <div className="pt-4">
+              <button type="submit" disabled={isGenerating}
+                className="w-full bg-white text-black font-semibold text-sm py-4 rounded-lg hover:bg-[#e5e5e5] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.08)] disabled:opacity-50 disabled:cursor-not-allowed">
+                {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><ShoppingBag className="w-4 h-4" /> Generate UGC Prompts</>}
+              </button>
+            </div>
+          </form>
+        </section>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="duration" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Durasi Video (s)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {DURATIONS.map((d) => <SelectItem key={d} value={d}>{d}s</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
+        {/* Right: Prompt Shell */}
+        <section className="lg:col-span-7 flex flex-col bg-[#141414] rounded-2xl border border-[#262626] overflow-hidden shadow-2xl min-h-[500px]">
+          {/* Shell Header */}
+          <div className="flex justify-between items-center px-6 py-4 border-b border-[#262626]">
+            <div className="flex items-center gap-3">
+              <div className={`w-2 h-2 rounded-full ${result ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : isGenerating ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)] animate-pulse" : "bg-[#555]"}`} />
+              <span className="text-[11px] font-semibold tracking-widest text-[#a3a3a3] uppercase">Prompt Shell</span>
+            </div>
+            {result && (
+              <button onClick={handleCopy} className="text-[#a3a3a3] hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider">
+                {copied ? "✓ Copied" : "⎘ Copy"}
+              </button>
+            )}
+          </div>
 
-                  <FormField control={form.control} name="videoModel" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Video Model</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {VIDEO_MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )} />
-                </div>
-
-                <FormField control={form.control} name="scriptMode" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Script Mode</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto AI Script</SelectItem>
-                        <SelectItem value="manual">Manual Script</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                {form.watch("scriptMode") === "manual" && (
-                  <FormField control={form.control} name="manualScript" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Manual Script</FormLabel>
-                      <FormControl><Textarea placeholder="Tulis script kamu..." {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm h-20" /></FormControl>
-                    </FormItem>
-                  )} />
-                )}
-
-                <FormField control={form.control} name="characterDesc" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Deskripsi Karakter (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Wanita Asia, rambut panjang, 22 tahun" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="productDesc" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Deskripsi Produk (opsional)</FormLabel>
-                    <FormControl><Input placeholder="Contoh: Tube pink 30ml, label gold" {...field} className="bg-[#0D0D0D] border-[#333333] focus:border-white font-mono text-sm" /></FormControl>
-                  </FormItem>
-                )} />
-
-                <Button type="submit" disabled={isGenerating} className="w-full bg-white text-black hover:bg-white/90 font-semibold h-11 gap-2">
-                  {isGenerating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><ShoppingBag className="w-4 h-4" /> Generate UGC Prompts</>}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
-        {/* Result */}
-        <div className="space-y-4">
-          {isGenerating && (
-            <Card className="bg-[#1A1A1A] border border-[#333333] animate-pulse">
-              <CardContent className="flex items-center justify-center h-64">
-                <div className="text-center space-y-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-white mx-auto" />
-                  <p className="text-sm text-muted-foreground">AI sedang membuat variasi prompt...</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Tabs */}
+          {result && (
+            <div className="flex border-b border-[#262626] px-6">
+              {([["images", "Image Prompts"], ["video", "Video Prompt"], ["jsonImage", "JSON Image"], ["jsonVideo", "JSON Video"]] as const).map(([id, label]) => (
+                <button key={id} onClick={() => setActiveTab(id)} className={`px-4 py-3 text-xs font-medium border-b-2 transition-colors ${activeTab === id ? "border-white text-white" : "border-transparent text-[#666] hover:text-[#a3a3a3]"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
 
-          {result && <UGCResultTabs result={result} />}
-        </div>
+          {/* Terminal Content */}
+          <div className="flex-1 bg-[#0a0a0a] m-4 rounded-xl border border-[#262626] overflow-hidden">
+            <div className="p-6 h-[500px] overflow-y-auto font-mono text-sm text-[#e5e5e5] leading-relaxed custom-scrollbar">
+              {isGenerating && !result && (
+                <div className="animate-pulse">
+                  <p className="text-green-400 mb-4">// Generation active...</p>
+                  <p className="text-[#a3a3a3] mb-4"># SYSTEM: UGC_AFFILIATE_GENERATOR</p>
+                  <p className="text-[#555]">Waiting for AI response...</p>
+                </div>
+              )}
+              {!isGenerating && !result && (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-[#555] text-center">Configure parameters and click Generate to see output here.</p>
+                </div>
+              )}
+              {result && (
+                <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{currentContent || "Section not found."}</pre>
+              )}
+            </div>
+          </div>
+
+          {/* Footer metadata */}
+          {result && (
+            <div className="px-6 py-4 border-t border-[#262626] grid grid-cols-2 gap-6">
+              <div>
+                <span className="text-[10px] font-semibold tracking-wider text-[#666] uppercase block mb-1">Characters</span>
+                <span className="font-mono text-xs text-white">{currentContent.length.toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-semibold tracking-wider text-[#666] uppercase block mb-1">Variants</span>
+                <span className="font-mono text-xs text-white">4</span>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
-  );
-}
-
-/**
- * Parse UGC output: Image Variants (1-4), Video Prompt, JSON Image, JSON Video.
- */
-function parseUGCResult(raw: string): { images: string; video: string; jsonImage: string; jsonVideo: string } {
-  const imageParts: string[] = [];
-  const videoParts: string[] = [];
-  const jsonImageParts: string[] = [];
-  const jsonVideoParts: string[] = [];
-
-  const imageRegex = /###?\s*IMAGE PROMPT VARIANT\s*\d+\s*\n([\s\S]*?)(?=###?\s*IMAGE PROMPT VARIANT|###?\s*VIDEO PROMPT|###?\s*JSON|$)/gi;
-  const videoRegex = /###?\s*VIDEO PROMPT\s*\n([\s\S]*?)(?=###?\s*JSON|###?\s*IMAGE|$)/gi;
-  const jsonImageRegex = /###?\s*JSON\s*(?:Image|Gambar)\s*\n([\s\S]*?)(?=###?\s*JSON\s*(?:Video)|###?\s*IMAGE|###?\s*VIDEO|$)/gi;
-  const jsonVideoRegex = /###?\s*JSON\s*(?:Video)\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
-
-  let match;
-  while ((match = imageRegex.exec(raw)) !== null) imageParts.push(match[1].trim());
-  while ((match = videoRegex.exec(raw)) !== null) videoParts.push(match[1].trim());
-  while ((match = jsonImageRegex.exec(raw)) !== null) jsonImageParts.push(match[1].trim());
-  while ((match = jsonVideoRegex.exec(raw)) !== null) jsonVideoParts.push(match[1].trim());
-
-  // Fallback: kalau AI output satu "### JSON" saja
-  if (jsonImageParts.length === 0 && jsonVideoParts.length === 0) {
-    const genericJsonRegex = /###?\s*JSON\s*\n([\s\S]*?)(?=###?\s*IMAGE|###?\s*VIDEO|$)/gi;
-    while ((match = genericJsonRegex.exec(raw)) !== null) {
-      jsonImageParts.push(match[1].trim());
-    }
-  }
-
-  return {
-    images: imageParts.length > 0 ? imageParts.map((p, i) => `── Variant ${i + 1} ──\n${p}`).join("\n\n") : raw,
-    video: videoParts.length > 0 ? videoParts.join("\n\n") : "",
-    jsonImage: jsonImageParts.length > 0 ? jsonImageParts.join("\n\n") : "",
-    jsonVideo: jsonVideoParts.length > 0 ? jsonVideoParts.join("\n\n") : "",
-  };
-}
-
-function UGCResultTabs({ result }: { result: string }) {
-  const [activeTab, setActiveTab] = useState<"images" | "video" | "jsonImage" | "jsonVideo">("images");
-  const [copiedTab, setCopiedTab] = useState(false);
-
-  const parsed = parseUGCResult(result);
-
-  const tabs = [
-    { id: "images" as const, label: "🖼️ Image Prompts", content: parsed.images },
-    { id: "video" as const, label: "🎬 Video Prompt", content: parsed.video },
-    { id: "jsonImage" as const, label: "{ } JSON Image", content: parsed.jsonImage },
-    { id: "jsonVideo" as const, label: "{ } JSON Video", content: parsed.jsonVideo },
-  ];
-
-  const currentContent = tabs.find((t) => t.id === activeTab)?.content || result;
-
-  const handleCopyTab = () => {
-    navigator.clipboard.writeText(currentContent);
-    setCopiedTab(true);
-    toast.success("Copied!");
-    setTimeout(() => setCopiedTab(false), 2000);
-  };
-
-  return (
-    <Card className="bg-[#1A1A1A] border border-[#333333]">
-      <CardHeader className="pb-0">
-        <div className="flex items-center justify-between mb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-white" />
-            Hasil Generate
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={handleCopyTab} className="gap-1.5 text-xs">
-            {copiedTab ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
-            {copiedTab ? "Copied!" : "Copy"}
-          </Button>
-        </div>
-        <div className="flex gap-1 border-b border-[#333333] -mx-6 px-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-white text-white"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4">
-        <div className="bg-[#0D0D0D] border border-[#333333] rounded-xl p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
-          {currentContent ? (
-            <pre className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed">{currentContent}</pre>
-          ) : (
-            <p className="text-xs text-muted-foreground italic text-center py-8">
-              Section ini tidak ditemukan. Coba generate ulang.
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
