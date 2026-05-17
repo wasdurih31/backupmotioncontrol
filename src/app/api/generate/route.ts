@@ -398,6 +398,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
   // ── Call provider API ──
   let taskId: string | null = null;
   let apiResponse: Response;
+  let externalNumericId: string | null = null;
 
   try {
     if (config.provider === 'freepik') {
@@ -502,6 +503,16 @@ async function handlePaygGenerate(req: Request, userId: string) {
       await cleanupBlobs([videoUrl, imageUrl]);
       return NextResponse.json({ error: 'Server AI tidak merespon dengan benar. Coba lagi.' }, { status: 500 });
     }
+
+    // Untuk geminigen: simpan juga numeric ID untuk webhook lookup
+    // Response geminigen: { id: 47779585, uuid: "3a8815c2-..." }
+    // Kita simpan uuid sebagai taskId (primary key), dan numeric id di freepikTaskId
+    if (config.provider === 'geminigen') {
+      const numId = responseData?.id || responseData?.data?.id;
+      if (numId && numId.toString() !== taskId) {
+        externalNumericId = numId.toString();
+      }
+    }
   } catch (e: any) {
     console.error(`[PAYG] Network error calling ${config.provider}:`, e);
     await cleanupBlobs([videoUrl, imageUrl]);
@@ -548,6 +559,8 @@ async function handlePaygGenerate(req: Request, userId: string) {
     status: 'processing',
     costRupiah: cost,
     source: config.source,
+    // Simpan numeric ID dari geminigen untuk webhook lookup
+    freepikTaskId: externalNumericId,
   });
 
   // ── Post-check concurrency race ──

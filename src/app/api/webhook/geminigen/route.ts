@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { tasks } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { tasks, users, balanceTransactions } from '@/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
 /**
  * POST /api/webhook/geminigen
@@ -24,7 +24,8 @@ export async function POST(req: Request) {
     }
 
     // Extract fields
-    const taskUuid = data?.id || data?.uuid || body?.uuid || body?.id;
+    const rawId = data?.id || data?.uuid || body?.uuid || body?.id;
+    const taskUuid = rawId != null ? String(rawId) : null;
     const status = data?.status || body?.status;
     const videoUrl = data?.url || data?.video_url || data?.output_url || data?.media_url || null;
 
@@ -35,17 +36,19 @@ export async function POST(req: Request) {
 
     console.log(`[Webhook geminigen] event=${event}, id=${taskUuid}, status=${status}, url=${videoUrl?.slice(0, 80)}`);
 
-    // Cari task di DB — coba match by id langsung, atau by uuid string
+    // Cari task di DB — coba match by id langsung (uuid), atau by freepikTaskId (numeric id)
     let [task] = await db.select().from(tasks).where(eq(tasks.id, taskUuid)).limit(1);
 
-    // Kalau tidak ketemu, mungkin id format berbeda — coba tanpa prefix
+    // Kalau tidak ketemu by primary key, coba lookup by freepikTaskId (numeric id dari geminigen)
     if (!task && typeof taskUuid === 'string') {
-      // Geminigen mungkin kirim numeric id, tapi kita simpan uuid
-      console.warn(`[Webhook geminigen] Task ${taskUuid} not found, trying alternate lookup`);
-      return NextResponse.json({ received: true, warning: 'task not found' });
+      [task] = await db.select().from(tasks).where(eq(tasks.freepikTaskId, taskUuid)).limit(1);
+      if (task) {
+        console.log(`[Webhook geminigen] Found task via freepikTaskId lookup: ${task.id}`);
+      }
     }
 
     if (!task) {
+      console.warn(`[Webhook geminigen] Task ${taskUuid} not found in DB (tried id + freepikTaskId)`);
       return NextResponse.json({ received: true, warning: 'task not found' });
     }
 
@@ -76,6 +79,28 @@ export async function POST(req: Request) {
         videoUrl: null,
         imageUrl: null,
       }).where(eq(tasks.id, task.id));
+
+      // ── Refund saldo untuk PAYG task yang gagal ──
+      if (task.costRupiah && task.costRupiah > 0) {
+        const [refunded] = await db.update(users)
+          .set({ balance: sql`${users.balance} + ${task.costRupiah}` })
+          .where(eq(users.id, task.userId))
+          .returning({ balance: users.balance });
+
+        if (refunded) {
+          await db.insert(balanceTransactions).values({
+            id: crypto.randomUUID(),
+            userId: task.userId,
+            type: 'refund',
+            amount: task.costRupiah,
+            balanceBefore: refunded.balance - task.costRupiah,
+            balanceAfter: refunded.balance,
+            description: `Refund generate gagal (webhook)`,
+            taskId: task.id,
+          });
+          console.log(`[Webhook geminigen] Refunded Rp ${task.costRupiah} to user ${task.userId}`);
+        }
+      }
 
       console.log(`[Webhook geminigen] Task ${task.id} → FAILED`);
     } else if (isCompleted && !videoUrl) {
