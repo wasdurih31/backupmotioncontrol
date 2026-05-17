@@ -503,6 +503,7 @@ export default function GenerateVideoPage() {
   const [userProfile, setUserProfile] = useState<{ accountType: string; balance: number } | null>(null);
   const [pricing, setPricing] = useState<Record<string, number>>({});
   const [selectedPaygModel, setSelectedPaygModel] = useState<string>('kling_std');
+  const [grokDuration, setGrokDuration] = useState<number>(6);
 
   const isPayg = userProfile?.accountType === 'payg';
   const currentCost = isPayg ? (pricing[`price_${selectedPaygModel}`] || 0) : 0;
@@ -638,6 +639,7 @@ export default function GenerateVideoPage() {
       values.paygModel = selectedPaygModel;
       if (selectedPaygModel === 'kling_pro') values.model = 'pro';
       else if (selectedPaygModel === 'kling_std') values.model = 'std';
+      if (selectedPaygModel === 'grok_720') values.duration = grokDuration;
     } else {
       if (values.engine === "kling") {
         if (!videoFile || !imageFile) {
@@ -824,7 +826,7 @@ export default function GenerateVideoPage() {
                 )} />
 
                 {/* Configuration Card — show for BYOK always, or PAYG with config options */}
-                {(!isPayg || selectedPaygModel.startsWith('kling') || selectedPaygModel.startsWith('veo')) && (
+                {(!isPayg || selectedPaygModel.startsWith('kling') || selectedPaygModel.startsWith('veo') || selectedPaygModel === 'grok_720') && (
                 <Card className="bg-card/20 border-border/40 overflow-hidden backdrop-blur-xl shadow-2xl">
                   <CardHeader className="px-5 py-4 border-b border-border/40 bg-white/5 flex flex-row items-center justify-between">
                     <CardTitle className="text-[11px] uppercase tracking-[0.2em] font-black flex items-center gap-2.5 text-white/90">
@@ -917,6 +919,22 @@ export default function GenerateVideoPage() {
                           <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
                             <SelectItem value="720" className="text-xs">720p {pricing.price_veo_720 ? `(Rp ${pricing.price_veo_720.toLocaleString('id-ID')})` : ''}</SelectItem>
                             <SelectItem value="1080" className="text-xs">1080p {pricing.price_veo_1080 ? `(Rp ${pricing.price_veo_1080.toLocaleString('id-ID')})` : ''}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {/* PAYG Grok: Duration selector */}
+                    {isPayg && selectedPaygModel === 'grok_720' && (
+                      <div className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                          <Clock className="w-3 h-3 text-green-400/70" />
+                          Duration
+                        </span>
+                        <Select value={String(grokDuration)} onValueChange={(val) => { if (val) setGrokDuration(parseInt(val)); }}>
+                          <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                            <SelectItem value="6" className="text-xs">6 Seconds</SelectItem>
+                            <SelectItem value="10" className="text-xs">10 Seconds</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

@@ -302,7 +302,7 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
 /** Handle PAYG video generation flow. */
 async function handlePaygGenerate(req: Request, userId: string) {
   const {
-    videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine, paygModel,
+    videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine, paygModel, duration,
   } = await req.json();
 
   // ── Validate paygModel ──
@@ -441,10 +441,10 @@ async function handlePaygGenerate(req: Request, userId: string) {
         if (imageUrl) formData.append('file_urls', imageUrl);
         formData.append('mode_image', 'frame');
       } else {
-        // Grok AI: model=grok-3, duration 6s, resolution 720p
+        // Grok AI: model=grok-3, duration from request (6 or 10), resolution 720p, aspect_ratio landscape
         formData.append('model', 'grok-3');
         formData.append('resolution', '720p');
-        formData.append('duration', '6');
+        formData.append('duration', String(duration || 6));
         formData.append('aspect_ratio', 'landscape');
         formData.append('mode', 'custom');
         if (imageUrl) formData.append('file_urls', imageUrl);
