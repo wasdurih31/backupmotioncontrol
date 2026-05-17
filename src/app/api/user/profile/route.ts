@@ -32,7 +32,9 @@ export async function GET() {
       accountType: users.accountType,
       balance: users.balance,
       totalGenerate: users.totalGenerate,
-      hasApiKey: users.apiKey, // just checking if it exists
+      subscriptionStart: users.subscriptionStart,
+      subscriptionEnd: users.subscriptionEnd,
+      hasApiKey: users.apiKey,
     }).from(users).where(eq(users.id, session.id)).limit(1);
 
     if (!userResult.length) return NextResponse.json({ error: 'User not found' }, { status: 404 });

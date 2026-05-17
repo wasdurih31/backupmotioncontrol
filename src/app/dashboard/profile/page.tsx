@@ -200,6 +200,39 @@ export default function ProfileSettingsPage() {
             <Label>Access Code</Label>
             <Input value={user.accessCode} readOnly className="bg-background/50 text-muted-foreground cursor-not-allowed uppercase font-mono" />
           </div>
+          {/* Masa Aktif — hanya untuk BYOK */}
+          {user.accountType !== 'payg' && (
+            <div className="space-y-2">
+              <Label>Masa Aktif Subscription</Label>
+              {user.subscriptionEnd ? (
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                  new Date(user.subscriptionEnd) > new Date()
+                    ? 'bg-green-500/5 border-green-500/20'
+                    : 'bg-red-500/5 border-red-500/20'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    new Date(user.subscriptionEnd) > new Date() ? 'bg-green-500' : 'bg-red-500'
+                  }`} />
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      new Date(user.subscriptionEnd) > new Date() ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {new Date(user.subscriptionEnd) > new Date() ? 'Aktif' : 'Expired'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.subscriptionStart && `Mulai: ${new Date(user.subscriptionStart).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+                      {user.subscriptionEnd && ` — Berakhir: ${new Date(user.subscriptionEnd).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-amber-500/5 border-amber-500/20">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <p className="text-sm text-amber-400">Belum ada subscription aktif. Hubungi admin.</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
