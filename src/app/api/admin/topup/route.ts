@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '@/lib/auth';
 import { db } from '@/db';
 import { users, balanceTransactions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
@@ -37,10 +37,13 @@ export async function POST(req: Request) {
     const balanceBefore = user.balance || 0;
     const balanceAfter = balanceBefore + amount;
 
-    // Update balance
-    await db.update(users)
-      .set({ balance: balanceAfter })
-      .where(eq(users.id, userId));
+    // Atomic update — prevent race condition if 2 admins topup same user simultaneously
+    const [updated] = await db.update(users)
+      .set({ balance: sql`${users.balance} + ${amount}` })
+      .where(eq(users.id, userId))
+      .returning({ balance: users.balance });
+
+    const actualBalanceAfter = updated?.balance ?? balanceAfter;
 
     // Insert transaction record
     await db.insert(balanceTransactions).values({
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
       type: 'topup',
       amount,
       balanceBefore,
-      balanceAfter,
+      balanceAfter: actualBalanceAfter,
       description: description || `Top up Rp ${amount.toLocaleString('id-ID')} oleh admin`,
       adminId: session.id,
     });
@@ -57,7 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       balanceBefore,
-      balanceAfter,
+      balanceAfter: actualBalanceAfter,
       email: user.email,
     });
   } catch (error: any) {
