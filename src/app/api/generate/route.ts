@@ -430,8 +430,17 @@ async function handlePaygGenerate(req: Request, userId: string) {
         ? 'https://api.geminigen.ai/uapi/v1/video-gen/veo'
         : 'https://api.geminigen.ai/uapi/v1/video-gen/grok';
 
+      // Build webhook URL so geminigen knows where to send completion callback
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
+      const webhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/geminigen` : '';
+
       const formData = new FormData();
       formData.append('prompt', prompt || 'Generate video from reference image');
+
+      // Attach webhook URL — geminigen will POST to this when video is ready
+      if (webhookUrl) {
+        formData.append('webhook_url', webhookUrl);
+      }
 
       if (config.engine === 'veo') {
         // Veo 3.1 Fast: model=veo-3.1-fast, duration fixed 8s, resolution 720p/1080p
@@ -450,6 +459,8 @@ async function handlePaygGenerate(req: Request, userId: string) {
         formData.append('mode', 'custom');
         if (imageUrl) formData.append('file_urls', imageUrl);
       }
+
+      console.log(`[PAYG] Calling geminigen: ${endpoint}, webhook: ${webhookUrl || 'NONE'}`);
 
       apiResponse = await fetch(endpoint, {
         method: 'POST',

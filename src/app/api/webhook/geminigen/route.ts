@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     // Format dari geminigen:
     // { "event": "image.generated", "timestamp": "...", "data": { "id": "uuid", "status": "completed", "url": "https://...", "user_id": "..." } }
-    const event = body?.event;
+    const event = body?.event || body?.event_name;
     const data = body?.data;
 
     if (!data) {
@@ -58,8 +58,8 @@ export async function POST(req: Request) {
     }
 
     // Determine outcome
-    const isCompleted = status === 'completed' || status === 'success';
-    const isFailed = status === 'failed' || status === 'error';
+    const isCompleted = status === 'completed' || status === 'success' || status === 2;
+    const isFailed = status === 'failed' || status === 'error' || status === 3 || status === 4;
 
     if (isCompleted && videoUrl) {
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
