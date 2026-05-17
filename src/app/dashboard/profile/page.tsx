@@ -203,7 +203,8 @@ export default function ProfileSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Freepik API Key */}
+      {/* Freepik API Key — hanya untuk BYOK */}
+      {user.accountType !== 'payg' && (
       <Card className="bg-card/30 border-border/50 relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/5 blur-3xl rounded-full pointer-events-none" />
         <CardHeader>
@@ -249,6 +250,7 @@ export default function ProfileSettingsPage() {
           </div>
         </CardFooter>
       </Card>
+      )}
 
       {/* Google AI Studio (Prompt Generator) */}
       <Card className="bg-card/30 border-border/50 relative overflow-hidden">
