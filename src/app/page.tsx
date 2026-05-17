@@ -70,33 +70,27 @@ export default function Home() {
             <div className="grid grid-cols-4 text-[11px] uppercase tracking-wider text-[#666] font-semibold border-b border-[#262626] px-6 py-4">
               <span>Platform</span>
               <span>Model</span>
-              <span>Harga / Video 5s</span>
+              <span>Harga / Video 15s</span>
               <span>Sistem</span>
             </div>
             <div className="divide-y divide-[#1a1a1a]">
               <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
-                <span className="text-[#888]">Runway</span>
-                <span className="text-[#888]">Gen-4</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 9.600</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">per detik</span>
-              </div>
-              <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
-                <span className="text-[#888]">Runway</span>
-                <span className="text-[#888]">Gen-4.5</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 20.000</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">per detik</span>
+                <span className="text-[#888]">Kling AI</span>
+                <span className="text-[#888]">Motion Control Std</span>
+                <span className="text-[#e5e5e5] font-mono">~Rp 16.800</span>
+                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.07/detik</span>
               </div>
               <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
                 <span className="text-[#888]">Kling AI</span>
-                <span className="text-[#888]">Pro (10s)</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 10.000</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">credit system</span>
+                <span className="text-[#888]">Motion Control Pro</span>
+                <span className="text-[#e5e5e5] font-mono">~Rp 33.600</span>
+                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.14/detik</span>
               </div>
               <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
                 <span className="text-[#888]">Veo 3.1</span>
-                <span className="text-[#888]">Fast (8s)</span>
+                <span className="text-[#888]">Fast 720p (8s)</span>
                 <span className="text-[#e5e5e5] font-mono">~Rp 12.800</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">per detik</span>
+                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.10/detik</span>
               </div>
               <div className="grid grid-cols-4 px-6 py-5 text-sm items-center bg-white/[0.02]">
                 <span className="text-white font-semibold">UniverseAI</span>
@@ -108,7 +102,7 @@ export default function Home() {
           </div>
 
           <p className="text-center text-[11px] text-[#555] mt-4">
-            * Harga kompetitor berdasarkan pricing resmi per Mei 2026. Konversi USD ke IDR ~Rp 16.000.
+            * Harga kompetitor berdasarkan pricing resmi API per Mei 2026. Konversi $1 = Rp 16.000.
           </p>
         </div>
       </section>
