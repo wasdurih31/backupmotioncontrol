@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { users, tasks } from '@/db/schema';
 import { and, eq, inArray, sql, gt } from 'drizzle-orm';
 import { runFreepikCall } from '@/lib/freepikQueue';
+import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'universeai-super-secret-key-2026');
 
@@ -237,11 +238,17 @@ export async function POST(req: Request) {
   }
 }
 
-/** Safely delete blobs — never throw even if deletion fails */
-async function cleanupBlobs(_urls: (string | null | undefined)[]) {
-  // DISABLED: Vercel Blob "Advanced Operations" limit reached (2k/month).
-  // Delete operations count as advanced ops. Blobs will accumulate in storage
-  // but won't block functionality. Manual cleanup via Vercel dashboard monthly.
-  // TODO: Migrate to Cloudflare R2 for unlimited delete operations.
-  return;
+/** Safely delete files dari R2 — unlimited operations, gratis. */
+async function cleanupBlobs(urls: (string | null | undefined)[]) {
+  for (const url of urls) {
+    if (!url) continue;
+    const key = getR2KeyFromUrl(url);
+    if (key) {
+      try {
+        await deleteFromR2(key);
+      } catch (e) {
+        console.warn(`[Cleanup] Failed to delete R2 key: ${key}`, e);
+      }
+    }
+  }
 }

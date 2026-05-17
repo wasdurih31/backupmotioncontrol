@@ -1,23 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { upload } from "@vercel/blob/client";
-
-/**
- * Buat pathname unique untuk upload ke Vercel Blob agar file dengan nama
- * sama bisa diupload berulang kali tanpa error "This blob already exists".
- *
- * Contoh: "my.mp4" → "videos/2026-05-12/1747..._ab12cd-my.mp4"
- */
-function uniquePathname(originalName: string, folder: string): string {
-  // Sanitasi nama: ganti karakter yang tidak aman untuk URL path.
-  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10); // YYYY-MM-DD
-  const ts = now.getTime();
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${folder}/${datePart}/${ts}_${rand}-${safeName}`;
-}
 
 // ─── Types ───────────────────────────────────────────────────────────
 export type StepStatus = "idle" | "running" | "success" | "error";
@@ -369,16 +352,21 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
         addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
 
         try {
-          // Client upload: browser → Vercel Blob langsung (bypass serverless
-          // 4.5 MB body limit). Token dibangkitkan oleh /api/upload.
-          // Nama file di-prefix unique agar file yang sama bisa diupload
-          // ulang tanpa error "This blob already exists".
-          const blob = await upload(uniquePathname(videoFile.name, "videos"), videoFile, {
-            access: "public",
-            handleUploadUrl: "/api/upload",
-            contentType: videoFile.type || "video/mp4",
+          // Direct upload ke R2 via /api/upload
+          const vRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: {
+              "x-filename": videoFile.name,
+              "x-content-type": videoFile.type || "video/mp4",
+            },
+            body: videoFile,
           });
-          videoBlobUrl = blob.url;
+          if (!vRes.ok) {
+            const errData = await vRes.json().catch(() => ({ error: `HTTP ${vRes.status}` }));
+            throw new Error(errData.error || `Upload failed (${vRes.status})`);
+          }
+          const vData = await vRes.json();
+          videoBlobUrl = vData.url;
         } catch (uploadErr: any) {
           updateStep("upload_video", "error", uploadErr.message?.slice(0, 60));
           addLog("error", `✗ Video upload failed: ${uploadErr.message}`);
@@ -393,16 +381,24 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
       // ── Step 3: Upload Image ──
       updateStep("upload_image", "running", "Uploading...");
-      addLog("info", `Uploading image to Vercel Blob (${(imageFile!.size / 1048576).toFixed(1)} MB)...`);
+      addLog("info", `Uploading image to R2 (${(imageFile!.size / 1048576).toFixed(1)} MB)...`);
 
       let imageBlobUrl: string;
       try {
-        const blob = await upload(uniquePathname(imageFile!.name, "images"), imageFile!, {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-          contentType: imageFile!.type || "image/jpeg",
+        const iRes = await fetch("/api/upload", {
+          method: "POST",
+          headers: {
+            "x-filename": imageFile!.name,
+            "x-content-type": imageFile!.type || "image/jpeg",
+          },
+          body: imageFile!,
         });
-        imageBlobUrl = blob.url;
+        if (!iRes.ok) {
+          const errData = await iRes.json().catch(() => ({ error: `HTTP ${iRes.status}` }));
+          throw new Error(errData.error || `Upload failed (${iRes.status})`);
+        }
+        const iData = await iRes.json();
+        imageBlobUrl = iData.url;
       } catch (uploadErr: any) {
         updateStep("upload_image", "error", uploadErr.message?.slice(0, 60));
         addLog("error", `✗ Image upload failed: ${uploadErr.message}`);

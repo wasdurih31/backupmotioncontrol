@@ -1,15 +1,21 @@
 import { db } from '@/db';
 import { tasks } from '@/db/schema';
 import { eq, and, lt } from 'drizzle-orm';
+import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
 
 // Result video berlaku 30 menit setelah selesai.
 export const RESULT_TTL_MS = 30 * 60 * 1000;
 
-/** Safely delete blobs — never throw. */
-async function cleanupBlobs(_urls: (string | null | undefined)[]) {
-  // DISABLED: Vercel Blob "Advanced Operations" limit reached.
-  // Blobs accumulate in storage. Manual cleanup via dashboard monthly.
-  return;
+/** Delete files dari R2 — gratis unlimited operations. */
+async function cleanupBlobs(urls: (string | null | undefined)[]) {
+  for (const url of urls) {
+    if (!url) continue;
+    const key = getR2KeyFromUrl(url);
+    if (key) {
+      await deleteFromR2(key);
+    }
+    // Juga handle legacy Vercel Blob URLs (skip, tidak bisa delete lagi)
+  }
 }
 
 /** Opportunistic cleanup: hapus blob dari task yang sudah expired. */
