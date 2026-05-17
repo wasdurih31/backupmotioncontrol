@@ -17,7 +17,8 @@ import {
   Database,
   KeyRound,
   Video,
-  Wallet
+  Wallet,
+  Settings
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,6 +31,7 @@ const adminLinks = [
   { name: "AI Keys", href: "/admin/ai-keys", icon: KeyRound },
   { name: "Video Keys", href: "/admin/video-keys", icon: Video },
   { name: "Top Up User", href: "/admin/topup", icon: Wallet },
+  { name: "Settings", href: "/admin/settings", icon: Settings },
   { name: "Database Backup", href: "/admin/backup", icon: Database },
 ];
 
