@@ -36,7 +36,19 @@ export default function Home() {
       // Fetch pricing
       try {
         const res = await fetch("/api/pricing");
-        if (res.ok) setPricing(await res.json());
+        if (res.ok) {
+          const json = await res.json();
+          const pr = json.pricing || json;
+          setPricing({
+            kling_std: pr.price_kling_std || pr.kling_std || 650,
+            kling_pro: pr.price_kling_pro || pr.kling_pro || 1000,
+            veo_720: pr.price_veo_720 || pr.veo_720 || 600,
+            veo_1080: pr.price_veo_1080 || pr.veo_1080 || 1000,
+            grok_720: pr.price_grok_720 || pr.grok_720 || 800,
+            whatsapp_link: pr.whatsapp_admin_link || pr.whatsapp_link || '',
+            byok_link: pr.byok_signup_link || pr.byok_link || '',
+          });
+        }
       } catch { /* use defaults */ }
     }
     init();

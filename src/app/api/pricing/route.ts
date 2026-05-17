@@ -9,6 +9,8 @@ const PRICING_KEYS = [
   'price_veo_720',
   'price_veo_1080',
   'price_grok_720',
+  'whatsapp_admin_link',
+  'byok_signup_link',
 ];
 
 /**
