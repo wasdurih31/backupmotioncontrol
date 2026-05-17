@@ -1249,6 +1249,19 @@ export default function GenerateVideoPage() {
         <main className="flex-1 min-w-0 space-y-8">
           <div className="space-y-8">
             {showMonitor && !isPayg && <ProcessMonitor steps={steps} logs={logs} isOpen={monitorOpen} onToggle={() => setMonitorOpen(!monitorOpen)} isRunning={isSubmitting} />}
+            {/* PAYG: Simple loading indicator tanpa expose provider info */}
+            {isPayg && isSubmitting && (
+              <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                  <span className="text-sm font-medium text-foreground">Memproses generate video...</span>
+                </div>
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3">Upload file dan mengirim ke server AI. Mohon tunggu...</p>
+              </div>
+            )}
             <ActiveTasksList />
             <div ref={resultSectionRef}><ResultSection /></div>
             <GallerySection />

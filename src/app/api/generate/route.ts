@@ -382,7 +382,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
   if (!poolKey) {
     await cleanupBlobs([videoUrl, imageUrl]);
     return NextResponse.json({
-      error: 'Tidak ada API key tersedia. Hubungi admin.',
+      error: 'Server sedang tidak tersedia. Hubungi admin.',
     }, { status: 503 });
   }
 
@@ -392,7 +392,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
   } catch (e) {
     console.error('[PAYG] Failed to decrypt pool key:', e);
     await cleanupBlobs([videoUrl, imageUrl]);
-    return NextResponse.json({ error: 'Gagal mendekripsi API key pool. Hubungi admin.' }, { status: 500 });
+    return NextResponse.json({ error: 'Server error. Hubungi admin.' }, { status: 500 });
   }
 
   // ── Call provider API ──
@@ -472,9 +472,18 @@ async function handlePaygGenerate(req: Request, userId: string) {
       }).where(eq(adminVideoKeys.id, poolKey.id));
 
       await cleanupBlobs([videoUrl, imageUrl]);
-      return NextResponse.json({
-        error: `API ${config.provider} error: ${errorData.message || errorData.error || JSON.stringify(errorData)}`,
-      }, { status: apiResponse.status >= 500 ? 502 : apiResponse.status });
+      // User-facing error tanpa expose provider name
+      let userMessage = 'Generate gagal. ';
+      if (apiResponse.status === 429) {
+        userMessage += 'Server sedang sibuk. Coba lagi dalam beberapa menit.';
+      } else if (apiResponse.status === 400) {
+        userMessage += 'File atau prompt tidak valid. Pastikan gambar/video sesuai format.';
+      } else if (apiResponse.status === 402 || apiResponse.status === 403) {
+        userMessage += 'Akses ditolak. Hubungi admin.';
+      } else {
+        userMessage += 'Terjadi kesalahan pada server AI. Coba lagi nanti.';
+      }
+      return NextResponse.json({ error: userMessage }, { status: apiResponse.status >= 500 ? 502 : apiResponse.status });
     }
 
     const responseData = await apiResponse.json();
@@ -484,12 +493,12 @@ async function handlePaygGenerate(req: Request, userId: string) {
     if (!taskId) {
       console.error(`[PAYG] No task_id in response:`, responseData);
       await cleanupBlobs([videoUrl, imageUrl]);
-      return NextResponse.json({ error: 'Invalid response from provider API (no task_id).' }, { status: 500 });
+      return NextResponse.json({ error: 'Server AI tidak merespon dengan benar. Coba lagi.' }, { status: 500 });
     }
   } catch (e: any) {
     console.error(`[PAYG] Network error calling ${config.provider}:`, e);
     await cleanupBlobs([videoUrl, imageUrl]);
-    return NextResponse.json({ error: `Network error: ${e.message}` }, { status: 502 });
+    return NextResponse.json({ error: 'Gagal terhubung ke server AI. Coba lagi nanti.' }, { status: 502 });
   }
 
   // ── API call succeeded — now charge balance atomically ──
