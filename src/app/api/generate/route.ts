@@ -487,9 +487,16 @@ async function handlePaygGenerate(req: Request, userId: string) {
     }
 
     const responseData = await apiResponse.json();
+    console.log(`[PAYG] Response from ${config.provider}:`, JSON.stringify(responseData).slice(0, 500));
 
-    // Extract task_id from response
-    taskId = responseData?.data?.task_id || responseData?.task_id || null;
+    // Extract task_id from response — try multiple possible paths
+    taskId = responseData?.data?.task_id
+      || responseData?.task_id
+      || responseData?.data?.id
+      || responseData?.id
+      || responseData?.data?.taskId
+      || responseData?.taskId
+      || null;
     if (!taskId) {
       console.error(`[PAYG] No task_id in response:`, responseData);
       await cleanupBlobs([videoUrl, imageUrl]);
