@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
-import { del } from '@vercel/blob';
 import { db } from '@/db';
 import { users, tasks } from '@/db/schema';
 import { and, eq, inArray, sql, gt } from 'drizzle-orm';
@@ -239,15 +238,10 @@ export async function POST(req: Request) {
 }
 
 /** Safely delete blobs — never throw even if deletion fails */
-async function cleanupBlobs(urls: (string | null | undefined)[]) {
-  for (const url of urls) {
-    if (url && url.includes('blob.vercel-storage.com')) {
-      try {
-        await del(url);
-        console.log(`[Cleanup] Deleted blob: ${url.slice(0, 60)}...`);
-      } catch (e) {
-        console.warn(`[Cleanup] Failed to delete blob: ${url}`, e);
-      }
-    }
-  }
+async function cleanupBlobs(_urls: (string | null | undefined)[]) {
+  // DISABLED: Vercel Blob "Advanced Operations" limit reached (2k/month).
+  // Delete operations count as advanced ops. Blobs will accumulate in storage
+  // but won't block functionality. Manual cleanup via Vercel dashboard monthly.
+  // TODO: Migrate to Cloudflare R2 for unlimited delete operations.
+  return;
 }

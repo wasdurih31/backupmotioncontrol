@@ -1,4 +1,3 @@
-import { del } from '@vercel/blob';
 import { db } from '@/db';
 import { tasks } from '@/db/schema';
 import { eq, and, lt } from 'drizzle-orm';
@@ -7,16 +6,10 @@ import { eq, and, lt } from 'drizzle-orm';
 export const RESULT_TTL_MS = 30 * 60 * 1000;
 
 /** Safely delete blobs — never throw. */
-async function cleanupBlobs(urls: (string | null | undefined)[]) {
-  for (const url of urls) {
-    if (url && url.includes('blob.vercel-storage.com')) {
-      try {
-        await del(url);
-      } catch (e) {
-        console.warn(`[Cleanup] Failed to delete blob: ${url}`, e);
-      }
-    }
-  }
+async function cleanupBlobs(_urls: (string | null | undefined)[]) {
+  // DISABLED: Vercel Blob "Advanced Operations" limit reached.
+  // Blobs accumulate in storage. Manual cleanup via dashboard monthly.
+  return;
 }
 
 /** Opportunistic cleanup: hapus blob dari task yang sudah expired. */
