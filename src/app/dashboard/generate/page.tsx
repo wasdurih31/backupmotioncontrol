@@ -1218,7 +1218,7 @@ export default function GenerateVideoPage() {
         {/* MAIN AREA - Monitor & Results */}
         <main className="flex-1 min-w-0 space-y-8">
           <div className="space-y-8">
-            {showMonitor && <ProcessMonitor steps={steps} logs={logs} isOpen={monitorOpen} onToggle={() => setMonitorOpen(!monitorOpen)} isRunning={isSubmitting} />}
+            {showMonitor && !isPayg && <ProcessMonitor steps={steps} logs={logs} isOpen={monitorOpen} onToggle={() => setMonitorOpen(!monitorOpen)} isRunning={isSubmitting} />}
             <ActiveTasksList />
             <div ref={resultSectionRef}><ResultSection /></div>
             <GallerySection />
