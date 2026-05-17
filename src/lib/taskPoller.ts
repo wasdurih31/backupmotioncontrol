@@ -186,16 +186,26 @@ async function pollGeminigenTask(task: DbTask): Promise<DbTask> {
     }
 
     const data = await res.json();
-    // Parse response: look for status and video URL
-    const remoteStatus = data?.data?.status || data?.status;
+    console.log(`[Poll ${task.id}] geminigen response:`, JSON.stringify(data).slice(0, 300));
+    // Geminigen uses numeric status: 1=processing, 2=completed, 3=failed (assumed)
+    // Also check string status for compatibility
+    const remoteStatus = data?.data?.status ?? data?.status;
     let newStatus: string = task.status;
     let resultUrl: string | null = task.resultUrl;
 
-    if (remoteStatus === 'completed' || remoteStatus === 'success' || remoteStatus === 'COMPLETED') {
+    // Numeric status from geminigen: 1=pending/processing, 2=completed, 3+=failed
+    const isCompleted = remoteStatus === 2 || remoteStatus === 'completed' || remoteStatus === 'success' || remoteStatus === 'COMPLETED';
+    const isFailed = remoteStatus === 3 || remoteStatus === 4 || remoteStatus === 'failed' || remoteStatus === 'error' || remoteStatus === 'FAILED';
+
+    if (isCompleted) {
       newStatus = 'success';
-      resultUrl = data?.data?.video_url || data?.data?.url || data?.video_url || data?.url
-        || data?.data?.result?.url || null;
-    } else if (remoteStatus === 'failed' || remoteStatus === 'error' || remoteStatus === 'FAILED') {
+      // Try multiple paths for video URL
+      resultUrl = data?.data?.video_url || data?.video_url
+        || data?.data?.url || data?.url
+        || data?.data?.output_url || data?.output_url
+        || data?.data?.result?.url || data?.data?.media_url
+        || null;
+    } else if (isFailed) {
       newStatus = 'failed';
     } else {
       newStatus = 'processing';

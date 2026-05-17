@@ -492,10 +492,10 @@ async function handlePaygGenerate(req: Request, userId: string) {
     // Extract task_id from response — try multiple possible paths
     taskId = responseData?.data?.task_id
       || responseData?.task_id
-      || responseData?.data?.id
-      || responseData?.id
-      || responseData?.data?.taskId
-      || responseData?.taskId
+      || responseData?.uuid
+      || responseData?.data?.uuid
+      || responseData?.data?.id?.toString()
+      || responseData?.id?.toString()
       || null;
     if (!taskId) {
       console.error(`[PAYG] No task_id in response:`, responseData);
