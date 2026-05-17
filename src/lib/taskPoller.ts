@@ -52,7 +52,10 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
 
   // Route to appropriate poller based on engine
   if (task.engine === 'veo' || task.engine === 'grok') {
-    return pollGeminigenTask(task);
+    // Geminigen.ai tidak punya endpoint polling GET.
+    // Status update diterima via webhook POST /api/webhook/geminigen.
+    // Jadi di sini kita hanya return task apa adanya dari DB.
+    return task;
   }
 
   const pollingEndpoint = task.engine === 'pixverse'
