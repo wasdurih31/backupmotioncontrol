@@ -1,21 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '@/lib/auth';
+import { isAdmin } from '@/lib/auth';
 import { db, backupDb } from '@/db';
 import { users } from '@/db/schema';
-import { eq, desc, and, or, ne } from 'drizzle-orm';
+import { eq, desc, and, or, ne, ilike } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(req: Request) {
   if (!await isAdmin()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const allUsers = await db.select({
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('search');
+
+    let query = db.select({
       id: users.id,
       email: users.email,
       phone: users.phone,
       accessCode: users.accessCode,
       role: users.role,
+      accountType: users.accountType,
+      balance: users.balance,
       totalGenerate: users.totalGenerate,
       createdAt: users.createdAt,
       lastLoginAt: users.lastLoginAt,
@@ -24,10 +29,21 @@ export async function GET() {
       subscriptionEnd: users.subscriptionEnd,
       apiKey: users.apiKey,
     })
-    .from(users)
-    .orderBy(desc(users.createdAt));
+    .from(users);
 
-    return NextResponse.json(allUsers);
+    let allUsers;
+    if (search) {
+      allUsers = await query.where(
+        or(
+          ilike(users.email, `%${search}%`),
+          eq(users.id, search),
+        )
+      ).orderBy(desc(users.createdAt));
+      return NextResponse.json({ data: allUsers });
+    } else {
+      allUsers = await query.orderBy(desc(users.createdAt));
+      return NextResponse.json(allUsers);
+    }
   } catch (error) {
     console.error('Admin Users GET Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

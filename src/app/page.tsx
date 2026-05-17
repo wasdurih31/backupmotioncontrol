@@ -1,83 +1,129 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Key, Zap, Lock, Clock, Video } from "lucide-react";
-
-const features = [
-  { icon: Key, title: "BYOK System", description: "Use your own Freepik API Key. No markup." },
-  { icon: Zap, title: "Fast Generation", description: "Optimized connection to Freepik endpoints." },
-  { icon: Lock, title: "Private Workflow", description: "Your API keys and generated videos are secure." },
-  { icon: Clock, title: "Temporary Storage", description: "Outputs auto-expire to ensure privacy." },
-  { icon: Video, title: "Motion Control Model", description: "Kling v2.6 Motion Control standard." },
-];
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-background">
-      {/* Background glow effects */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/[0.02] blur-[120px] rounded-full pointer-events-none" />
-      
-      <main className="flex-1 w-full max-w-5xl px-6 flex flex-col items-center justify-center text-center z-10 pt-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="space-y-6 max-w-3xl"
-        >
-          <div className="inline-flex items-center rounded-full border border-border px-3 py-1 text-sm text-muted-foreground mb-4">
-            <span className="flex h-2 w-2 rounded-full bg-white mr-2"></span>
-            Kling v2.6 Integration
-          </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground">
-            UniverseAI <span className="text-muted-foreground">Studio</span>
-          </h1>
-          <p className="text-2xl md:text-3xl font-medium text-foreground mt-2">
-            Motion Control Video Generator
-          </p>
-          <p className="text-lg text-muted-foreground mt-6 max-w-2xl mx-auto leading-relaxed">
-            Generate cinematic AI motion videos using your own Freepik API key.
-            A premium, private, and fast workflow for professionals.
-          </p>
-          
-          <div className="flex items-center justify-center gap-4 mt-10">
-            <Link href="/login">
-              <Button size="lg" className="h-12 px-8 text-base bg-white text-black hover:bg-white/90 rounded-full">
-                Login
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-            <Button size="lg" variant="outline" className="h-12 px-8 text-base rounded-full border-border hover:bg-white/5">
-              Learn More
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-4">
-            Use your own API key. No hidden markup.
-          </p>
-        </motion.div>
+  const router = useRouter();
 
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-32 w-full"
-        >
-          {features.map((feature, i) => (
-            <div key={i} className="flex flex-col items-center text-center p-6 rounded-2xl border border-border/50 bg-card/30 backdrop-blur-sm">
-              <div className="h-12 w-12 rounded-full border border-border flex items-center justify-center mb-4">
-                <feature.icon className="h-5 w-5 text-foreground" />
+  useEffect(() => {
+    async function checkLoggedIn() {
+      try {
+        const res = await fetch("/api/user/profile");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.id) {
+            router.push("/dashboard");
+          }
+        }
+      } catch {
+        // not logged in, stay on landing
+      }
+    }
+    checkLoggedIn();
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a] text-[#e5e5e5]">
+      {/* Hero */}
+      <header className="text-center pt-20 pb-12 px-4">
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+          UniverseAI <span className="text-[#a3a3a3]">Studio</span>
+        </h1>
+        <p className="text-lg md:text-xl text-[#a3a3a3] mt-4 max-w-2xl mx-auto">
+          Platform AI Video Generation — Pilih paket sesuai kebutuhan Anda
+        </p>
+      </header>
+
+      {/* Pricing Cards */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card 1: PAY AS YOU GO */}
+          <div className="bg-[#141414] border border-[#333] rounded-2xl p-6 flex flex-col">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#a3a3a3] mb-2">
+              Pay As You Go
+            </div>
+            <h2 className="text-2xl font-bold mb-1">Pay As You Go</h2>
+            <p className="text-[#a3a3a3] text-sm mb-6">Cukup daftar dan isi saldo</p>
+
+            <div className="space-y-4 flex-1">
+              <div>
+                <p className="text-xs text-[#a3a3a3] uppercase tracking-wider mb-2">Model tersedia</p>
+                <ul className="text-sm space-y-1">
+                  <li>• Kling Motion Control Std/Pro</li>
+                  <li>• Veo 3.1 Fast 720/1080</li>
+                  <li>• Grok AI 720</li>
+                </ul>
               </div>
-              <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {feature.description}
+
+              <div>
+                <p className="text-xs text-[#a3a3a3] uppercase tracking-wider mb-2">Harga</p>
+                <p className="text-sm">Rp 650 - Rp 1.000 per generate</p>
+              </div>
+
+              <div>
+                <p className="text-xs text-[#a3a3a3] uppercase tracking-wider mb-2">Top-up</p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-[#0a0a0a] border border-[#333] rounded-lg px-3 py-1 text-sm">Rp 10.000</span>
+                  <span className="bg-[#0a0a0a] border border-[#333] rounded-lg px-3 py-1 text-sm">Rp 25.000</span>
+                  <span className="bg-[#0a0a0a] border border-[#333] rounded-lg px-3 py-1 text-sm">Rp 50.000</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <Link href="/login">
+                <button className="w-full py-3 rounded-xl bg-white text-black font-semibold hover:bg-white/90 transition-colors">
+                  Daftar &amp; Top Up
+                </button>
+              </Link>
+              <p className="text-xs text-[#a3a3a3] text-center">
+                Daftar akun dulu, lalu hubungi admin via WhatsApp untuk isi saldo
               </p>
             </div>
-          ))}
-        </motion.div>
+          </div>
+
+          {/* Card 2: BYOK */}
+          <div className="bg-[#141414] border border-[#333] rounded-2xl p-6 flex flex-col">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#a3a3a3] mb-2">
+              BYOK
+            </div>
+            <h2 className="text-2xl font-bold mb-1">BYOK (Bring Your Own Key)</h2>
+            <p className="text-[#a3a3a3] text-sm mb-6">Rp 49.000/bulan</p>
+
+            <div className="space-y-4 flex-1">
+              <div>
+                <p className="text-xs text-[#a3a3a3] uppercase tracking-wider mb-2">Model tersedia</p>
+                <ul className="text-sm space-y-1">
+                  <li>• Kling Motion Control Std/Pro</li>
+                  <li>• PixVerse V5</li>
+                  <li>• Kling 2.1 Pro</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-xs text-[#a3a3a3] uppercase tracking-wider mb-2">Fitur</p>
+                <p className="text-sm">Unlimited generate dengan API key sendiri</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <a href="#byok-signup" target="_blank" rel="noopener noreferrer">
+                <button className="w-full py-3 rounded-xl bg-white text-black font-semibold hover:bg-white/90 transition-colors">
+                  Daftar BYOK
+                </button>
+              </a>
+              <p className="text-xs text-[#a3a3a3] text-center">
+                Hubungi admin untuk mendaftar paket BYOK
+              </p>
+            </div>
+          </div>
+        </div>
       </main>
 
-      <footer className="w-full py-6 text-center text-sm text-muted-foreground border-t border-border/50 mt-auto z-10">
+      {/* Footer */}
+      <footer className="py-6 text-center text-sm text-[#a3a3a3] border-t border-[#333]">
         UniverseAI Studio &copy; 2026
       </footer>
     </div>

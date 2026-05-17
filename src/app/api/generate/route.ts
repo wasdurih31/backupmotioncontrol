@@ -48,6 +48,30 @@ export async function POST(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // ── Account type check ──
+    const [accountCheck] = await db.select({
+      accountType: users.accountType,
+      subscriptionEnd: users.subscriptionEnd,
+    }).from(users).where(eq(users.id, session.id)).limit(1);
+
+    if (!accountCheck) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (accountCheck.accountType === 'payg') {
+      return NextResponse.json({
+        error: 'Fitur generate untuk akun PAYG sedang dalam pengembangan.',
+      }, { status: 400 });
+    }
+
+    if (accountCheck.accountType === 'byok') {
+      if (!accountCheck.subscriptionEnd || new Date(accountCheck.subscriptionEnd) < new Date()) {
+        return NextResponse.json({
+          error: 'Subscription BYOK Anda sudah habis. Perpanjang untuk melanjutkan generate.',
+        }, { status: 403 });
+      }
+    }
+
     const {
       videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine,
       resolution, duration, negative_prompt, style,

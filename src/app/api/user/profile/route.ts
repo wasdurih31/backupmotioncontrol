@@ -16,6 +16,8 @@ export async function GET() {
         email: 'admin',
         phone: null,
         role: 'admin',
+        accountType: 'byok',
+        balance: 0,
         totalGenerate: 0,
         hasApiKey: true,
       });
@@ -27,6 +29,8 @@ export async function GET() {
       phone: users.phone,
       accessCode: users.accessCode,
       role: users.role,
+      accountType: users.accountType,
+      balance: users.balance,
       totalGenerate: users.totalGenerate,
       hasApiKey: users.apiKey, // just checking if it exists
     }).from(users).where(eq(users.id, session.id)).limit(1);

@@ -12,7 +12,8 @@ import {
   ShieldAlert,
   Loader2,
   Sparkles,
-  Wand2
+  Wand2,
+  Wallet
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useGenerateStore } from "@/store/useGenerateStore";
@@ -21,6 +22,7 @@ const navLinks = [
   { name: "Home", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Generate Video", shortName: "Generate", href: "/dashboard/generate", icon: Sparkles },
   { name: "Prompt Gen", shortName: "Prompt", href: "/dashboard/promptgen", icon: Wand2 },
+  { name: "Top Up", shortName: "Top Up", href: "/dashboard/topup", icon: Wallet, paygOnly: true },
   { name: "Tutorials", shortName: "Tutorials", href: "/dashboard/tutorial", icon: Video },
   { name: "Profile Settings", shortName: "Profile", href: "/dashboard/profile", icon: Settings },
 ];
@@ -105,7 +107,7 @@ export default function DashboardLayout({
           </Link>
           
           <nav className="flex items-center gap-1">
-            {navLinks.map((link) => {
+            {navLinks.filter((link) => !('paygOnly' in link && link.paygOnly) || user?.accountType === 'payg').map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link key={link.name} href={link.href} className="block">
@@ -134,14 +136,32 @@ export default function DashboardLayout({
             </div>
             
             <Link href="/dashboard/profile">
-              <div className={`flex items-center gap-2 text-sm border rounded-full px-4 py-1.5 shadow-sm cursor-pointer transition-colors ${user.hasApiKey ? 'bg-green-500/5 border-green-500/30 text-green-400 hover:bg-green-500/10' : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'}`}>
-                {user.hasApiKey ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
-                <span className="font-medium hidden lg:inline">
-                  {user.hasApiKey ? 'API Key Active' : 'API Key Missing'}
-                </span>
-                <span className="font-medium lg:hidden">
-                  {user.hasApiKey ? 'Active' : 'Missing'}
-                </span>
+              <div className={`flex items-center gap-2 text-sm border rounded-full px-4 py-1.5 shadow-sm cursor-pointer transition-colors ${
+                user.accountType === 'payg'
+                  ? 'bg-blue-500/5 border-blue-500/30 text-blue-400 hover:bg-blue-500/10'
+                  : user.hasApiKey ? 'bg-green-500/5 border-green-500/30 text-green-400 hover:bg-green-500/10' : 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
+              }`}>
+                {user.accountType === 'payg' ? (
+                  <>
+                    <Wallet className="w-4 h-4" />
+                    <span className="font-medium hidden lg:inline">
+                      💰 Saldo: Rp {(user.balance || 0).toLocaleString('id-ID')}
+                    </span>
+                    <span className="font-medium lg:hidden">
+                      Rp {(user.balance || 0).toLocaleString('id-ID')}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {user.hasApiKey ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                    <span className="font-medium hidden lg:inline">
+                      {user.hasApiKey ? 'API Key Active' : 'API Key Missing'}
+                    </span>
+                    <span className="font-medium lg:hidden">
+                      {user.hasApiKey ? 'Active' : 'Missing'}
+                    </span>
+                  </>
+                )}
               </div>
             </Link>
           </div>
@@ -173,9 +193,22 @@ export default function DashboardLayout({
 
         <div className="flex items-center gap-3">
           <Link href="/dashboard/profile">
-            <div className={`flex items-center gap-1.5 text-xs border rounded-full px-3 py-1 ${user.hasApiKey ? 'border-green-500/30 text-green-400' : 'border-red-500/30 text-red-400'}`}>
-              {user.hasApiKey ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
-              <span className="font-medium">{user.hasApiKey ? 'Active' : 'Missing'}</span>
+            <div className={`flex items-center gap-1.5 text-xs border rounded-full px-3 py-1 ${
+              user.accountType === 'payg'
+                ? 'border-blue-500/30 text-blue-400'
+                : user.hasApiKey ? 'border-green-500/30 text-green-400' : 'border-red-500/30 text-red-400'
+            }`}>
+              {user.accountType === 'payg' ? (
+                <>
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span className="font-medium">Rp {(user.balance || 0).toLocaleString('id-ID')}</span>
+                </>
+              ) : (
+                <>
+                  {user.hasApiKey ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+                  <span className="font-medium">{user.hasApiKey ? 'Active' : 'Missing'}</span>
+                </>
+              )}
             </div>
           </Link>
           <button
@@ -206,7 +239,7 @@ export default function DashboardLayout({
       <nav className="fixed bottom-0 left-0 right-0 md:hidden z-50">
         <div className="bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="flex items-center justify-around px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            {navLinks.map((link) => {
+            {navLinks.filter((link) => !('paygOnly' in link && link.paygOnly) || user?.accountType === 'payg').map((link) => {
               const isActive = pathname === link.href;
               const isGenerateLink = link.href === '/dashboard/generate';
               return (
