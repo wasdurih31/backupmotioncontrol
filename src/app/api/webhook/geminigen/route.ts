@@ -13,29 +13,39 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log('[Webhook geminigen] Received:', JSON.stringify(body).slice(0, 500));
 
-    // Extract UUID dan status dari payload
-    // Format kemungkinan: { uuid, status, video_url, ... } atau { data: { uuid, ... } }
-    const uuid = body?.uuid || body?.data?.uuid || body?.task_id || body?.data?.task_id || body?.id?.toString();
-    const status = body?.status ?? body?.data?.status;
-    const videoUrl = body?.video_url || body?.data?.video_url
-      || body?.output_url || body?.data?.output_url
-      || body?.url || body?.data?.url
-      || body?.media_url || body?.data?.media_url
-      || body?.result?.url || body?.data?.result?.url
-      || null;
+    // Format dari geminigen:
+    // { "event": "image.generated", "timestamp": "...", "data": { "id": "uuid", "status": "completed", "url": "https://...", "user_id": "..." } }
+    const event = body?.event;
+    const data = body?.data;
 
-    if (!uuid) {
-      console.warn('[Webhook geminigen] No UUID in payload:', body);
-      return NextResponse.json({ received: true, warning: 'no uuid' });
+    if (!data) {
+      console.warn('[Webhook geminigen] No data in payload');
+      return NextResponse.json({ received: true, warning: 'no data' });
     }
 
-    console.log(`[Webhook geminigen] UUID=${uuid}, status=${status}, videoUrl=${videoUrl?.slice(0, 80)}`);
+    // Extract fields
+    const taskUuid = data?.id || data?.uuid || body?.uuid || body?.id;
+    const status = data?.status || body?.status;
+    const videoUrl = data?.url || data?.video_url || data?.output_url || data?.media_url || null;
 
-    // Cari task di DB berdasarkan UUID
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, uuid)).limit(1);
+    if (!taskUuid) {
+      console.warn('[Webhook geminigen] No task ID in payload:', body);
+      return NextResponse.json({ received: true, warning: 'no id' });
+    }
+
+    console.log(`[Webhook geminigen] event=${event}, id=${taskUuid}, status=${status}, url=${videoUrl?.slice(0, 80)}`);
+
+    // Cari task di DB — coba match by id langsung, atau by uuid string
+    let [task] = await db.select().from(tasks).where(eq(tasks.id, taskUuid)).limit(1);
+
+    // Kalau tidak ketemu, mungkin id format berbeda — coba tanpa prefix
+    if (!task && typeof taskUuid === 'string') {
+      // Geminigen mungkin kirim numeric id, tapi kita simpan uuid
+      console.warn(`[Webhook geminigen] Task ${taskUuid} not found, trying alternate lookup`);
+      return NextResponse.json({ received: true, warning: 'task not found' });
+    }
 
     if (!task) {
-      console.warn(`[Webhook geminigen] Task ${uuid} not found in DB`);
       return NextResponse.json({ received: true, warning: 'task not found' });
     }
 
@@ -44,13 +54,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, already_final: true });
     }
 
-    // Determine new status
-    // Geminigen numeric: 1=processing, 2=completed, 3+=failed
-    const isCompleted = status === 2 || status === 'completed' || status === 'success';
-    const isFailed = status === 3 || status === 4 || status === 'failed' || status === 'error';
+    // Determine outcome
+    const isCompleted = status === 'completed' || status === 'success';
+    const isFailed = status === 'failed' || status === 'error';
 
     if (isCompleted && videoUrl) {
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 menit
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await db.update(tasks).set({
         status: 'success' as any,
         resultUrl: videoUrl,
@@ -58,33 +67,33 @@ export async function POST(req: Request) {
         expiresAt,
         videoUrl: null,
         imageUrl: null,
-      }).where(eq(tasks.id, uuid));
+      }).where(eq(tasks.id, task.id));
 
-      console.log(`[Webhook geminigen] Task ${uuid} → SUCCESS, video: ${videoUrl.slice(0, 60)}`);
+      console.log(`[Webhook geminigen] Task ${task.id} → SUCCESS, video: ${videoUrl.slice(0, 80)}`);
     } else if (isFailed) {
       await db.update(tasks).set({
         status: 'failed' as any,
         videoUrl: null,
         imageUrl: null,
-      }).where(eq(tasks.id, uuid));
+      }).where(eq(tasks.id, task.id));
 
-      console.log(`[Webhook geminigen] Task ${uuid} → FAILED`);
+      console.log(`[Webhook geminigen] Task ${task.id} → FAILED`);
     } else if (isCompleted && !videoUrl) {
-      // Completed tapi tidak ada video URL — coba extract dari body lain
-      console.warn(`[Webhook geminigen] Task ${uuid} completed but no video URL found in:`, JSON.stringify(body).slice(0, 300));
-      // Tetap mark success, mungkin URL ada di field lain
+      console.warn(`[Webhook geminigen] Task ${task.id} completed but no video URL in payload`);
       await db.update(tasks).set({
         status: 'success' as any,
         resultUrl: null,
         expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-      }).where(eq(tasks.id, uuid));
+      }).where(eq(tasks.id, task.id));
+    } else {
+      console.log(`[Webhook geminigen] Task ${task.id} — unhandled status: ${status}`);
     }
 
     return NextResponse.json({ received: true, status: 'ok' });
   } catch (error) {
     console.error('[Webhook geminigen] Error:', error);
+    // Return 200 even on error — prevent geminigen from retrying endlessly
     return NextResponse.json({ received: true, error: 'internal' }, { status: 200 });
-    // Return 200 even on error — prevent geminigen from retrying
   }
 }
 
