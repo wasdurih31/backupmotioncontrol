@@ -52,10 +52,9 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
 
   // Route to appropriate poller based on engine
   if (task.engine === 'veo' || task.engine === 'grok') {
-    // Geminigen.ai tidak punya endpoint polling GET.
-    // Status update diterima via webhook POST /api/webhook/geminigen.
-    // Jadi di sini kita hanya return task apa adanya dari DB.
-    return task;
+    // Geminigen.ai: coba polling sebagai fallback (webhook adalah primary).
+    // Jika polling gagal (404/error), tetap return task dari DB.
+    return await pollGeminigenTask(task);
   }
 
   const pollingEndpoint = task.engine === 'pixverse'
@@ -144,6 +143,7 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
 /**
  * Poll geminigen.ai task (veo / grok engines).
  * Uses admin pool key since PAYG users don't have their own geminigen key.
+ * Tries multiple endpoint formats as fallback to webhook.
  */
 async function pollGeminigenTask(task: DbTask): Promise<DbTask> {
   // Get geminigen pool key (sticky: oldest last_used_at)
@@ -172,89 +172,104 @@ async function pollGeminigenTask(task: DbTask): Promise<DbTask> {
     return task;
   }
 
-  const endpoint = task.engine === 'veo'
-    ? `https://api.geminigen.ai/uapi/v1/video-gen/veo/${task.id}`
-    : `https://api.geminigen.ai/uapi/v1/video-gen/grok/${task.id}`;
+  // Try multiple endpoint formats — geminigen docs are unclear on polling
+  const taskIdForPoll = task.freepikTaskId || task.id; // numeric id or uuid
+  const endpoints = [
+    // Format 1: /uapi/v1/video-gen/{engine}/{id}
+    task.engine === 'veo'
+      ? `https://api.geminigen.ai/uapi/v1/video-gen/veo/${taskIdForPoll}`
+      : `https://api.geminigen.ai/uapi/v1/video-gen/grok/${taskIdForPoll}`,
+    // Format 2: /uapi/v1/tasks/{uuid}
+    `https://api.geminigen.ai/uapi/v1/tasks/${task.id}`,
+    // Format 3: /uapi/v1/video-gen/status/{id}
+    `https://api.geminigen.ai/uapi/v1/video-gen/status/${taskIdForPoll}`,
+  ];
 
-  try {
-    const res = await fetch(endpoint, {
-      headers: {
-        'x-api-key': decryptedKey,
-        'Accept': 'application/json',
-      },
-    });
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          'x-api-key': decryptedKey,
+          'Accept': 'application/json',
+        },
+      });
 
-    if (!res.ok) {
+      if (!res.ok) {
+        // 404 = endpoint doesn't exist, try next
+        if (res.status === 404) continue;
+        // Other errors — skip polling entirely
+        return task;
+      }
+
+      const data = await res.json();
+      console.log(`[Poll ${task.id}] geminigen response from ${endpoint}:`, JSON.stringify(data).slice(0, 300));
+
+      // Extract status — geminigen uses numeric status: 1=processing, 2=completed, 3=failed
+      const remoteStatus = data?.data?.status ?? data?.status ?? data?.status_desc;
+      let newStatus: string = task.status;
+      let resultUrl: string | null = task.resultUrl;
+
+      const isCompleted = remoteStatus === 2 || remoteStatus === 'completed' || remoteStatus === 'success' || remoteStatus === 'COMPLETED';
+      const isFailed = remoteStatus === 3 || remoteStatus === 4 || remoteStatus === 'failed' || remoteStatus === 'error' || remoteStatus === 'FAILED';
+
+      if (isCompleted) {
+        newStatus = 'success';
+        resultUrl = data?.data?.video_url || data?.video_url
+          || data?.data?.url || data?.url
+          || data?.data?.output_url || data?.output_url
+          || data?.data?.result?.url || data?.data?.media_url
+          || null;
+      } else if (isFailed) {
+        newStatus = 'failed';
+      } else {
+        newStatus = 'processing';
+      }
+
+      if (newStatus === task.status) {
+        return task;
+      }
+
+      if (newStatus === 'success') {
+        const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
+        await db.update(tasks).set({
+          status: 'success' as any,
+          resultUrl,
+          prompt: null,
+          expiresAt,
+          videoUrl: null,
+          imageUrl: null,
+        }).where(eq(tasks.id, task.id));
+        await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+        task.status = 'success' as any;
+        task.resultUrl = resultUrl;
+        task.prompt = null;
+        task.expiresAt = expiresAt;
+        task.videoUrl = null;
+        task.imageUrl = null;
+      } else if (newStatus === 'failed') {
+        await db.update(tasks).set({
+          status: 'failed' as any,
+          videoUrl: null,
+          imageUrl: null,
+        }).where(eq(tasks.id, task.id));
+        await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+        task.status = 'failed' as any;
+        task.videoUrl = null;
+        task.imageUrl = null;
+      } else {
+        await db.update(tasks).set({ status: newStatus as any }).where(eq(tasks.id, task.id));
+        task.status = newStatus as any;
+      }
+
       return task;
+    } catch (e) {
+      // Network error on this endpoint — try next
+      continue;
     }
-
-    const data = await res.json();
-    console.log(`[Poll ${task.id}] geminigen response:`, JSON.stringify(data).slice(0, 300));
-    // Geminigen uses numeric status: 1=processing, 2=completed, 3=failed (assumed)
-    // Also check string status for compatibility
-    const remoteStatus = data?.data?.status ?? data?.status;
-    let newStatus: string = task.status;
-    let resultUrl: string | null = task.resultUrl;
-
-    // Numeric status from geminigen: 1=pending/processing, 2=completed, 3+=failed
-    const isCompleted = remoteStatus === 2 || remoteStatus === 'completed' || remoteStatus === 'success' || remoteStatus === 'COMPLETED';
-    const isFailed = remoteStatus === 3 || remoteStatus === 4 || remoteStatus === 'failed' || remoteStatus === 'error' || remoteStatus === 'FAILED';
-
-    if (isCompleted) {
-      newStatus = 'success';
-      // Try multiple paths for video URL
-      resultUrl = data?.data?.video_url || data?.video_url
-        || data?.data?.url || data?.url
-        || data?.data?.output_url || data?.output_url
-        || data?.data?.result?.url || data?.data?.media_url
-        || null;
-    } else if (isFailed) {
-      newStatus = 'failed';
-    } else {
-      newStatus = 'processing';
-    }
-
-    if (newStatus === task.status) {
-      return task;
-    }
-
-    if (newStatus === 'success') {
-      const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
-      await db.update(tasks).set({
-        status: 'success' as any,
-        resultUrl,
-        prompt: null,
-        expiresAt,
-        videoUrl: null,
-        imageUrl: null,
-      }).where(eq(tasks.id, task.id));
-      await cleanupBlobs([task.videoUrl, task.imageUrl]);
-
-      task.status = 'success' as any;
-      task.resultUrl = resultUrl;
-      task.prompt = null;
-      task.expiresAt = expiresAt;
-      task.videoUrl = null;
-      task.imageUrl = null;
-    } else if (newStatus === 'failed') {
-      await db.update(tasks).set({
-        status: 'failed' as any,
-        videoUrl: null,
-        imageUrl: null,
-      }).where(eq(tasks.id, task.id));
-      await cleanupBlobs([task.videoUrl, task.imageUrl]);
-
-      task.status = 'failed' as any;
-      task.videoUrl = null;
-      task.imageUrl = null;
-    } else {
-      await db.update(tasks).set({ status: newStatus as any }).where(eq(tasks.id, task.id));
-      task.status = newStatus as any;
-    }
-
-    return task;
-  } catch (e) {
-    console.warn(`[Poll ${task.id}] geminigen error:`, e);
-    return task;
   }
+
+  // All endpoints failed (404) — rely on webhook, return task as-is from DB
+  return task;
 }
