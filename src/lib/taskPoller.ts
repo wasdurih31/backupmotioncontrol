@@ -176,7 +176,7 @@ async function pollGeminigenTask(task: DbTask): Promise<DbTask> {
   try {
     const res = await fetch(endpoint, {
       headers: {
-        'Authorization': `Bearer ${decryptedKey}`,
+        'x-api-key': decryptedKey,
         'Accept': 'application/json',
       },
     });

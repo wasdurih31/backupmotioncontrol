@@ -281,21 +281,21 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
     settingsKey: 'price_veo_720',
     source: 'payg_geminigen_pool',
     engine: 'veo',
-    model: 'veo-3.1-fast',
+    model: 'veo-2',
   },
   veo_1080: {
     provider: 'geminigen',
     settingsKey: 'price_veo_1080',
     source: 'payg_geminigen_pool',
     engine: 'veo',
-    model: 'veo-3.1-fast',
+    model: 'veo-2',
   },
   grok_720: {
     provider: 'geminigen',
     settingsKey: 'price_grok_720',
     source: 'payg_geminigen_pool',
     engine: 'grok',
-    model: 'grok',
+    model: 'grok-3',
   },
 };
 
@@ -424,27 +424,38 @@ async function handlePaygGenerate(req: Request, userId: string) {
         body: JSON.stringify(payload),
       }));
     } else {
-      // Geminigen (veo / grok)
+      // Geminigen (veo / grok) — multipart/form-data format
       const endpoint = config.engine === 'veo'
         ? 'https://api.geminigen.ai/uapi/v1/video-gen/veo'
         : 'https://api.geminigen.ai/uapi/v1/video-gen/grok';
 
-      const resolution = paygModel === 'veo_1080' ? '1080p' : '720p';
-      const payload = {
-        model: config.engine === 'veo' ? 'veo-3.1-fast' : 'grok',
-        image_url: imageUrl,
-        prompt: prompt || '',
-        resolution,
-        duration: 5,
-      };
+      const formData = new FormData();
+      formData.append('prompt', prompt || 'Generate video from reference image');
+
+      if (config.engine === 'veo') {
+        // Veo 3.1 Fast: model=veo-2, duration fixed 8s, resolution 720p/1080p
+        formData.append('model', 'veo-2');
+        formData.append('resolution', paygModel === 'veo_1080' ? '1080p' : '720p');
+        formData.append('duration', '8');
+        formData.append('aspect_ratio', '16:9');
+        if (imageUrl) formData.append('file_urls', imageUrl);
+        formData.append('mode_image', 'frame');
+      } else {
+        // Grok AI: model=grok-3, duration 6s, resolution 720p
+        formData.append('model', 'grok-3');
+        formData.append('resolution', '720p');
+        formData.append('duration', '6');
+        formData.append('aspect_ratio', 'landscape');
+        formData.append('mode', 'custom');
+        if (imageUrl) formData.append('file_urls', imageUrl);
+      }
 
       apiResponse = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${decryptedKey}`,
-          'Content-Type': 'application/json',
+          'x-api-key': decryptedKey,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
     }
 
