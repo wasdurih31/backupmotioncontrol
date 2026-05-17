@@ -926,10 +926,13 @@ export default function GenerateVideoPage() {
                     {/* PAYG Grok: Duration selector */}
                     {isPayg && selectedPaygModel === 'grok_720' && (
                       <div className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
-                          <Clock className="w-3 h-3 text-green-400/70" />
-                          Duration
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                            <Clock className="w-3 h-3 text-green-400/70" />
+                            Duration
+                          </span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-400 font-mono border border-green-500/20">720p</span>
+                        </div>
                         <Select value={String(grokDuration)} onValueChange={(val) => { if (val) setGrokDuration(parseInt(val)); }}>
                           <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
