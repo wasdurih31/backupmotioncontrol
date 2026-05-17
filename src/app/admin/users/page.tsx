@@ -249,7 +249,7 @@ export default function AdminUsersPage() {
     return (user.email?.toLowerCase().includes(searchLower) || 
             user.phone?.toLowerCase().includes(searchLower) || 
             user.id.toLowerCase().includes(searchLower) || 
-            user.accessCode.toLowerCase().includes(searchLower));
+            user.accessCode?.toLowerCase().includes(searchLower));
   });
 
   return (
