@@ -1205,6 +1205,13 @@ export default function GenerateVideoPage() {
                     style={{ width: `${(activeCount / MAX_CONCURRENT_TASKS) * 100}%` }}
                   />
                 </div>
+                {/* PAYG: Cost info di atas tombol (visible saat scroll ke bawah) */}
+                {isPayg && currentCost > 0 && (
+                  <div className="flex items-center justify-between px-1 py-1.5 text-[11px]">
+                    <span className="text-muted-foreground">Saldo: <span className="text-foreground font-mono">Rp {(userProfile?.balance ?? 0).toLocaleString('id-ID')}</span></span>
+                    <span className={`font-mono font-bold ${balanceInsufficient ? 'text-red-400' : 'text-green-400'}`}>Biaya: Rp {currentCost.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
                 <Button
                   type="submit"
                   size="lg"
@@ -1217,6 +1224,8 @@ export default function GenerateVideoPage() {
                     <><Wallet className="h-5 w-5" /> SALDO TIDAK CUKUP</>
                   ) : slotsFull ? (
                     <><Clock className="h-5 w-5" /> SLOT PENUH ({activeCount}/{MAX_CONCURRENT_TASKS})</>
+                  ) : isPayg && currentCost > 0 ? (
+                    <><Sparkles className="h-5 w-5" /> GENERATE (Rp {currentCost.toLocaleString('id-ID')}){activeCount > 0 ? ` +${activeCount}` : ""}</>
                   ) : (
                     <><Sparkles className="h-5 w-5" /> START GENERATE{activeCount > 0 ? ` (+${activeCount} BERJALAN)` : ""}</>
                   )}
