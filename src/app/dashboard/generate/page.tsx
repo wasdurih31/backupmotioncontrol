@@ -636,6 +636,8 @@ export default function GenerateVideoPage() {
       };
       values.engine = engineMap[selectedPaygModel] || "kling";
       values.paygModel = selectedPaygModel;
+      if (selectedPaygModel === 'kling_pro') values.model = 'pro';
+      else if (selectedPaygModel === 'kling_std') values.model = 'std';
     } else {
       if (values.engine === "kling") {
         if (!videoFile || !imageFile) {
@@ -700,13 +702,14 @@ export default function GenerateVideoPage() {
                   </div>
 
                   {isPayg ? (
-                    /* PAYG Model Selector */
+                    /* PAYG Engine Selector — model STD/PRO ada di Configuration card */
                     <Select
-                      value={selectedPaygModel}
+                      value={selectedPaygModel.startsWith('kling') ? 'kling' : selectedPaygModel.startsWith('veo') ? 'veo' : 'grok'}
                       onValueChange={(val) => {
                         if (!val) return;
-                        setSelectedPaygModel(val);
-                        form.setValue('paygModel', val);
+                        if (val === 'kling') setSelectedPaygModel('kling_std');
+                        else if (val === 'veo') setSelectedPaygModel('veo_720');
+                        else setSelectedPaygModel('grok_720');
                       }}
                     >
                       <SelectTrigger className="w-full bg-white/5 border-border/40 h-11 text-xs focus:ring-1 focus:ring-blue-500/50 transition-all hover:bg-white/[0.08] shadow-inner">
@@ -714,33 +717,29 @@ export default function GenerateVideoPage() {
                           <Sparkles className="w-4 h-4 text-blue-400" />
                           <div className="flex flex-col items-start leading-tight">
                             <span className="text-[10px] text-white/40 font-medium uppercase tracking-tighter">PAYG</span>
-                            <SelectValue placeholder="Select Model" />
+                            <span className="text-xs font-bold text-foreground">
+                              {selectedPaygModel.startsWith('kling') ? 'Motion Control' : selectedPaygModel.startsWith('veo') ? 'Veo 3.1 Fast' : 'Grok AI'}
+                            </span>
                           </div>
                         </div>
                       </SelectTrigger>
                       <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40 shadow-2xl">
                         <SelectGroup>
-                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling Motion Control</SelectLabel>
-                          <SelectItem value="kling_std" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
-                            Kling MC Std {pricing.price_kling_std ? `(Rp ${pricing.price_kling_std.toLocaleString('id-ID')})` : ''}
-                          </SelectItem>
-                          <SelectItem value="kling_pro" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
-                            Kling MC Pro {pricing.price_kling_pro ? `(Rp ${pricing.price_kling_pro.toLocaleString('id-ID')})` : ''}
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling AI Engine</SelectLabel>
+                          <SelectItem value="kling" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Motion Control
                           </SelectItem>
                         </SelectGroup>
                         <SelectGroup>
-                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Veo 3.1 Fast</SelectLabel>
-                          <SelectItem value="veo_720" className="text-xs py-2.5 cursor-pointer focus:bg-purple-500/10">
-                            Veo 3.1 Fast 720p {pricing.price_veo_720 ? `(Rp ${pricing.price_veo_720.toLocaleString('id-ID')})` : ''}
-                          </SelectItem>
-                          <SelectItem value="veo_1080" className="text-xs py-2.5 cursor-pointer focus:bg-purple-500/10">
-                            Veo 3.1 Fast 1080p {pricing.price_veo_1080 ? `(Rp ${pricing.price_veo_1080.toLocaleString('id-ID')})` : ''}
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Google Veo</SelectLabel>
+                          <SelectItem value="veo" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Veo 3.1 Fast
                           </SelectItem>
                         </SelectGroup>
                         <SelectGroup>
-                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Grok AI</SelectLabel>
-                          <SelectItem value="grok_720" className="text-xs py-2.5 cursor-pointer focus:bg-green-500/10">
-                            Grok AI 720p {pricing.price_grok_720 ? `(Rp ${pricing.price_grok_720.toLocaleString('id-ID')})` : ''}
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">xAI</SelectLabel>
+                          <SelectItem value="grok" className="text-xs py-2.5 cursor-pointer focus:bg-green-500/10">
+                            Grok AI
                           </SelectItem>
                         </SelectGroup>
                       </SelectContent>
@@ -824,8 +823,8 @@ export default function GenerateVideoPage() {
                   </FormItem>
                 )} />
 
-                {/* Configuration Card — only show for BYOK or PAYG kling models */}
-                {(!isPayg || selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') && (
+                {/* Configuration Card — show for BYOK always, or PAYG with config options */}
+                {(!isPayg || selectedPaygModel.startsWith('kling') || selectedPaygModel.startsWith('veo')) && (
                 <Card className="bg-card/20 border-border/40 overflow-hidden backdrop-blur-xl shadow-2xl">
                   <CardHeader className="px-5 py-4 border-b border-border/40 bg-white/5 flex flex-row items-center justify-between">
                     <CardTitle className="text-[11px] uppercase tracking-[0.2em] font-black flex items-center gap-2.5 text-white/90">
@@ -835,7 +834,95 @@ export default function GenerateVideoPage() {
                     <Settings className="w-3.5 h-3.5 text-white/30" />
                   </CardHeader>
                   <CardContent className="p-0 divide-y divide-border/30">
-                    {form.watch("engine") === "kling" ? (
+                    {/* PAYG Kling: STD/PRO selector */}
+                    {isPayg && selectedPaygModel.startsWith('kling') && (
+                      <>
+                        <div className="grid grid-cols-2 divide-x divide-border/30">
+                          <div className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Sparkles className="w-3 h-3 text-blue-400/70" />
+                                Model
+                              </span>
+                              <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono border border-blue-500/20 w-fit">
+                                {selectedPaygModel === 'kling_pro' ? 'PREMIUM' : 'STANDARD'}
+                              </span>
+                            </div>
+                            <Select value={selectedPaygModel === 'kling_pro' ? 'pro' : 'std'} onValueChange={(val) => {
+                              setSelectedPaygModel(val === 'pro' ? 'kling_pro' : 'kling_std');
+                              form.setValue('paygModel', val === 'pro' ? 'kling_pro' : 'kling_std');
+                            }}>
+                              <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                <SelectItem value="std" className="text-xs">STD {pricing.price_kling_std ? `(Rp ${pricing.price_kling_std.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                <SelectItem value="pro" className="text-xs">PRO {pricing.price_kling_pro ? `(Rp ${pricing.price_kling_pro.toLocaleString('id-ID')})` : ''}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <FormField control={form.control} name="character_orientation" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <div className="flex flex-col gap-1.5">
+                                <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                  <VideoIcon className="w-3 h-3 text-amber-400/70" />
+                                  Constraint
+                                </FormLabel>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono border border-amber-500/20 w-fit">
+                                  {field.value === "video" ? "30s MAX" : "10s MAX"}
+                                </span>
+                              </div>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="video" className="text-xs">Video</SelectItem>
+                                  <SelectItem value="image" className="text-xs">Image</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                        </div>
+                        <FormField control={form.control} name="cfg_scale" render={({ field }) => (
+                          <FormItem className="p-4 space-y-4 hover:bg-white/[0.02] transition-colors">
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Terminal className="w-3 h-3 text-green-400/70" />
+                                Guidance Scale
+                              </FormLabel>
+                              <span className="text-[11px] font-mono font-bold text-green-400">{field.value?.toFixed(1)}</span>
+                            </div>
+                            <FormControl>
+                              <div className="px-1 py-1">
+                                <Input type="range" step="0.1" min="0" max="1" className="h-1.5 w-full bg-white/10 rounded-full appearance-none cursor-pointer accent-green-500" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <div className="flex justify-between mt-2 px-0.5"><span className="text-[8px] text-white/20 font-bold">MIN</span><span className="text-[8px] text-white/20 font-bold">MAX</span></div>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </>
+                    )}
+                    {/* PAYG Veo: Resolution selector */}
+                    {isPayg && selectedPaygModel.startsWith('veo') && (
+                      <div className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                          <ImageIcon className="w-3 h-3 text-blue-400/70" />
+                          Resolution
+                        </span>
+                        <Select value={selectedPaygModel === 'veo_1080' ? '1080' : '720'} onValueChange={(val) => {
+                          const m = val === '1080' ? 'veo_1080' : 'veo_720';
+                          setSelectedPaygModel(m);
+                          form.setValue('paygModel', m);
+                        }}>
+                          <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                            <SelectItem value="720" className="text-xs">720p {pricing.price_veo_720 ? `(Rp ${pricing.price_veo_720.toLocaleString('id-ID')})` : ''}</SelectItem>
+                            <SelectItem value="1080" className="text-xs">1080p {pricing.price_veo_1080 ? `(Rp ${pricing.price_veo_1080.toLocaleString('id-ID')})` : ''}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {/* BYOK Configuration */}
+                    {!isPayg && form.watch("engine") === "kling" ? (
                       <>
                         <div className="grid grid-cols-2 divide-x divide-border/30">
                           <FormField control={form.control} name="model" render={({ field }) => (
