@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, Plus, Trash2, Video, ToggleLeft, ToggleRight, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Trash2, Video, ToggleLeft, ToggleRight, AlertCircle, Upload, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +40,25 @@ function statusBadge(status: string) {
 export default function AdminVideoKeysPage() {
   const [keys, setKeys] = useState<VideoKey[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Single add form
   const [showForm, setShowForm] = useState(false);
   const [formProvider, setFormProvider] = useState("freepik");
   const [formApiKey, setFormApiKey] = useState("");
   const [formLabel, setFormLabel] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Bulk import form
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkProvider, setBulkProvider] = useState("freepik");
+  const [bulkKeys, setBulkKeys] = useState("");
+  const [bulkLabelPrefix, setBulkLabelPrefix] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editStatus, setEditStatus] = useState("");
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -66,6 +80,9 @@ export default function AdminVideoKeysPage() {
 
   const freepikKeys = keys.filter((k) => k.provider === "freepik");
   const geminiGenKeys = keys.filter((k) => k.provider === "geminigen");
+
+  // Count lines in bulk textarea
+  const bulkLineCount = bulkKeys.split("\n").filter((l) => l.trim().length > 0).length;
 
   async function handleAdd() {
     if (!formApiKey.trim()) {
@@ -93,6 +110,44 @@ export default function AdminVideoKeysPage() {
       toast.error("Gagal menambahkan key");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleBulkImport() {
+    if (!bulkKeys.trim()) {
+      toast.error("Masukkan minimal 1 API key");
+      return;
+    }
+    setBulkSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/video-keys", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: bulkProvider,
+          keys: bulkKeys,
+          labelPrefix: bulkLabelPrefix || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        let msg = `${data.inserted} key berhasil ditambahkan.`;
+        if (data.skipped > 0) {
+          msg += ` ${data.skipped} key dilewati (melebihi batas).`;
+        }
+        msg += ` Total: ${data.total}/${data.max}`;
+        toast.success(msg);
+        setBulkKeys("");
+        setBulkLabelPrefix("");
+        setShowBulk(false);
+        fetchKeys();
+      } else {
+        toast.error(data.error || "Gagal import key");
+      }
+    } catch {
+      toast.error("Gagal import key");
+    } finally {
+      setBulkSubmitting(false);
     }
   }
 
@@ -133,6 +188,35 @@ export default function AdminVideoKeysPage() {
     }
   }
 
+  async function handleEdit(id: string) {
+    try {
+      const updateData: Record<string, any> = { id };
+      if (editLabel.trim()) updateData.label = editLabel;
+      if (editStatus) updateData.status = editStatus;
+
+      const res = await fetch("/api/admin/video-keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+      if (res.ok) {
+        toast.success("Key berhasil diperbarui");
+        setEditingId(null);
+        fetchKeys();
+      } else {
+        toast.error("Gagal memperbarui key");
+      }
+    } catch {
+      toast.error("Gagal memperbarui key");
+    }
+  }
+
+  function startEdit(k: VideoKey) {
+    setEditingId(k.id);
+    setEditLabel(k.label || "");
+    setEditStatus(k.status);
+  }
+
   function renderTable(keyList: VideoKey[]) {
     if (keyList.length === 0) {
       return (
@@ -163,9 +247,44 @@ export default function AdminVideoKeysPage() {
                 <td className="p-4">
                   <Badge variant="outline" className="text-xs">{k.provider}</Badge>
                 </td>
-                <td className="p-4 text-foreground/80">{k.label || "-"}</td>
+                <td className="p-4">
+                  {editingId === k.id ? (
+                    <Input
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      className="h-7 text-xs bg-black/20 border-border/40 w-32"
+                      placeholder="Label..."
+                    />
+                  ) : (
+                    <span
+                      className="text-foreground/80 cursor-pointer hover:text-foreground hover:underline"
+                      onClick={() => startEdit(k)}
+                      title="Klik untuk edit"
+                    >
+                      {k.label || "-"}
+                    </span>
+                  )}
+                </td>
                 <td className="p-4 font-mono text-xs text-muted-foreground">{k.maskedKey}</td>
-                <td className="p-4">{statusBadge(k.status)}</td>
+                <td className="p-4">
+                  {editingId === k.id ? (
+                    <Select value={editStatus} onValueChange={(v) => { if (v) setEditStatus(v); }}>
+                      <SelectTrigger className="h-7 text-xs bg-black/20 border-border/40 w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="limit_reached">Limit Reached</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                        <SelectItem value="disabled">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="cursor-pointer" onClick={() => startEdit(k)} title="Klik untuk edit">
+                      {statusBadge(k.status)}
+                    </span>
+                  )}
+                </td>
                 <td className="p-4 text-muted-foreground">{k.usageCount}</td>
                 <td className="p-4 text-xs text-muted-foreground">
                   {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString("id-ID") : "-"}
@@ -181,28 +300,51 @@ export default function AdminVideoKeysPage() {
                   )}
                 </td>
                 <td className="p-4">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleToggle(k.id, k.isActive)}
-                      title={k.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      className="h-8 w-8"
-                    >
-                      {k.isActive ? (
-                        <ToggleRight className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <ToggleLeft className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(k.id)}
-                      className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    {editingId === k.id ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(k.id)}
+                          className="h-7 text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingId(null)}
+                          className="h-7 text-xs"
+                        >
+                          Batal
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggle(k.id, k.isActive)}
+                          title={k.isActive ? "Nonaktifkan" : "Aktifkan"}
+                          className="h-8 w-8"
+                        >
+                          {k.isActive ? (
+                            <ToggleRight className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(k.id)}
+                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -233,13 +375,26 @@ export default function AdminVideoKeysPage() {
             Kelola API key pool untuk PAYG video generation (Freepik &amp; geminigen.ai)
           </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Key
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => { setShowBulk(!showBulk); setShowForm(false); }}
+            className="gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk Import
+          </Button>
+          <Button
+            onClick={() => { setShowForm(!showForm); setShowBulk(false); }}
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Key
+          </Button>
+        </div>
       </div>
 
-      {/* Add Key Form */}
+      {/* Single Add Key Form */}
       {showForm && (
         <Card className="bg-card/50 border-border/50">
           <CardHeader className="pb-4">
@@ -290,13 +445,104 @@ export default function AdminVideoKeysPage() {
         </Card>
       )}
 
+      {/* Bulk Import Form */}
+      {showBulk && (
+        <Card className="bg-card/50 border-purple-500/30 border">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Upload className="w-4 h-4 text-purple-400" />
+              Bulk Import API Keys
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Masukkan API key satu per baris. Baris kosong dan duplikat akan otomatis dilewati.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Provider</label>
+                <Select value={bulkProvider} onValueChange={(v) => { if (v) setBulkProvider(v); }}>
+                  <SelectTrigger className="bg-black/20 border-border/40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="freepik">Freepik (max 100)</SelectItem>
+                    <SelectItem value="geminigen">geminigen.ai (max 2)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Label Prefix (opsional)</label>
+                <Input
+                  placeholder="Contoh: Freepik Key"
+                  value={bulkLabelPrefix}
+                  onChange={(e) => setBulkLabelPrefix(e.target.value)}
+                  className="bg-black/20 border-border/40"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Hasil: &quot;{bulkLabelPrefix || (bulkProvider === 'freepik' ? 'Freepik Key' : 'Geminigen Key')} #1&quot;, &quot;...#2&quot;, dst.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-muted-foreground">API Keys (satu per baris)</label>
+                <span className="text-xs text-muted-foreground">
+                  {bulkLineCount} key{bulkLineCount !== 1 ? 's' : ''} terdeteksi
+                </span>
+              </div>
+              <textarea
+                placeholder={`Masukkan API key, satu per baris:\nFPSX685264xxxxxxxxxxxxxxxxxxxx\nFPSX685264xxxxxxxxxxxxxxxxxxxx\nFPSX685264xxxxxxxxxxxxxxxxxxxx`}
+                value={bulkKeys}
+                onChange={(e) => setBulkKeys(e.target.value)}
+                rows={8}
+                className="w-full rounded-md border border-border/40 bg-black/20 px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 resize-y min-h-[120px]"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleBulkImport}
+                disabled={bulkSubmitting || bulkLineCount === 0}
+                className="gap-2 bg-purple-600 hover:bg-purple-700"
+              >
+                {bulkSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+                Import {bulkLineCount} Key{bulkLineCount !== 1 ? 's' : ''}
+              </Button>
+              <Button variant="ghost" onClick={() => setShowBulk(false)}>Batal</Button>
+              {bulkKeys.trim() && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBulkKeys("")}
+                  className="text-xs text-muted-foreground ml-auto"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Freepik Keys Section */}
       <Card className="bg-card/30 border-border/50">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            Freepik Keys
-            <Badge variant="outline" className="text-xs">{freepikKeys.length} / 100</Badge>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              Freepik Keys
+              <Badge variant="outline" className="text-xs">{freepikKeys.length} / 100</Badge>
+            </CardTitle>
+            <Button variant="ghost" size="icon" onClick={fetchKeys} className="h-7 w-7" title="Refresh">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {renderTable(freepikKeys)}
