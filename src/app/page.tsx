@@ -1,24 +1,50 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+interface Pricing {
+  kling_std: number;
+  kling_pro: number;
+  veo_720: number;
+  veo_1080: number;
+  grok_720: number;
+  whatsapp_link: string;
+  byok_link: string;
+}
+
+function fmtRp(n: number) {
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
+
 export default function Home() {
   const router = useRouter();
+  const [pricing, setPricing] = useState<Pricing | null>(null);
 
   useEffect(() => {
-    async function checkLoggedIn() {
+    async function init() {
+      // Cek login
       try {
         const res = await fetch("/api/user/profile");
         if (res.ok) {
           const data = await res.json();
-          if (data.id) router.push("/dashboard");
+          if (data.id) { router.push("/dashboard"); return; }
         }
       } catch { /* not logged in */ }
+
+      // Fetch pricing
+      try {
+        const res = await fetch("/api/pricing");
+        if (res.ok) setPricing(await res.json());
+      } catch { /* use defaults */ }
     }
-    checkLoggedIn();
+    init();
   }, [router]);
+
+  const p = pricing || { kling_std: 650, kling_pro: 1000, veo_720: 600, veo_1080: 1000, grok_720: 800, whatsapp_link: "", byok_link: "" };
+  const minPrice = Math.min(p.kling_std, p.kling_pro, p.veo_720, p.veo_1080, p.grok_720);
+  const maxPrice = Math.max(p.kling_std, p.kling_pro, p.veo_720, p.veo_1080, p.grok_720);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5] font-sans antialiased">
@@ -41,7 +67,7 @@ export default function Home() {
             <span className="text-[#a3a3a3]">tanpa biaya per detik.</span>
           </h1>
           <p className="text-lg md:text-xl text-[#888] max-w-2xl mx-auto leading-relaxed">
-            Platform lain mencharge Rp 10.000–20.000 per video. Di sini mulai dari Rp 650. Flat rate, bukan per detik.
+            Platform lain mencharge Rp 10.000–20.000 per video. Di sini mulai dari {fmtRp(minPrice)}. Flat rate, bukan per detik.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/login" className="px-8 py-3.5 bg-white text-black font-semibold rounded-lg hover:bg-[#e5e5e5] transition-colors text-sm">
@@ -95,7 +121,7 @@ export default function Home() {
               <div className="grid grid-cols-4 px-6 py-5 text-sm items-center bg-white/[0.02]">
                 <span className="text-white font-semibold">UniverseAI</span>
                 <span className="text-white">Semua Model</span>
-                <span className="text-white font-bold font-mono">Rp 650–1.000</span>
+                <span className="text-white font-bold font-mono">{fmtRp(minPrice)}–{fmtRp(maxPrice)}</span>
                 <span className="text-[10px] text-white bg-white/10 px-2 py-1 rounded w-fit font-medium">flat / video</span>
               </div>
             </div>
@@ -130,12 +156,17 @@ export default function Home() {
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.1em] text-[#666] font-semibold mb-3">Model AI tersedia</p>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Std</span><span className="font-mono text-white">Rp 650</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Pro</span><span className="font-mono text-white">Rp 1.000</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 720p</span><span className="font-mono text-white">Rp 600</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 1080p</span><span className="font-mono text-white">Rp 1.000</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Grok AI 720p</span><span className="font-mono text-white">Rp 800</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Std</span><span className="font-mono text-white">{fmtRp(p.kling_std)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Pro</span><span className="font-mono text-white">{fmtRp(p.kling_pro)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 720p</span><span className="font-mono text-white">{fmtRp(p.veo_720)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 1080p</span><span className="font-mono text-white">{fmtRp(p.veo_1080)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Grok AI 720p</span><span className="font-mono text-white">{fmtRp(p.grok_720)}</span></div>
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.1em] text-[#666] font-semibold mb-3">Harga</p>
+                  <p className="text-sm">{fmtRp(minPrice)} - {fmtRp(maxPrice)} per generate</p>
                 </div>
 
                 <div>
@@ -194,7 +225,7 @@ export default function Home() {
               </div>
 
               <div className="mt-8 space-y-3">
-                <a href="#byok-signup" target="_blank" rel="noopener noreferrer">
+                <a href={p.byok_link || "#byok-signup"} target="_blank" rel="noopener noreferrer">
                   <button className="w-full py-3.5 rounded-lg border border-[#333] text-[#e5e5e5] font-semibold text-sm hover:bg-[#1a1a1a] transition-colors">
                     Hubungi Admin
                   </button>
