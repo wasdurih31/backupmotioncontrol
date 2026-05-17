@@ -281,14 +281,14 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
     settingsKey: 'price_veo_720',
     source: 'payg_geminigen_pool',
     engine: 'veo',
-    model: 'veo-2',
+    model: 'veo-3.1-fast',
   },
   veo_1080: {
     provider: 'geminigen',
     settingsKey: 'price_veo_1080',
     source: 'payg_geminigen_pool',
     engine: 'veo',
-    model: 'veo-2',
+    model: 'veo-3.1-fast',
   },
   grok_720: {
     provider: 'geminigen',
@@ -433,8 +433,8 @@ async function handlePaygGenerate(req: Request, userId: string) {
       formData.append('prompt', prompt || 'Generate video from reference image');
 
       if (config.engine === 'veo') {
-        // Veo 3.1 Fast: model=veo-2, duration fixed 8s, resolution 720p/1080p
-        formData.append('model', 'veo-2');
+        // Veo 3.1 Fast: model=veo-3.1-fast, duration fixed 8s, resolution 720p/1080p
+        formData.append('model', 'veo-3.1-fast');
         formData.append('resolution', paygModel === 'veo_1080' ? '1080p' : '720p');
         formData.append('duration', '8');
         formData.append('aspect_ratio', '16:9');
