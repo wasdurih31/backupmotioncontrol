@@ -112,11 +112,20 @@ const INITIAL_STEPS: PipelineStep[] = [
   { id: "save_task", label: "Save Task to Database", status: "idle" },
 ];
 
-const POLL_FIRST_DELAY_MS = 5 * 60 * 1000; // first poll: 5 menit setelah task dibuat
-const POLL_MIN_INTERVAL_MS = 30 * 1000;    // minimum 30s antar poll berikutnya
-const POLL_MAX_INTERVAL_MS = 90 * 1000;    // maximum 90s antar poll berikutnya
-const POLL_HIDDEN_INTERVAL_MS = 5 * 60 * 1000; // saat tab tidak aktif: cek tiap 5 menit saja
-const TASK_TIMEOUT_MS = 40 * 60 * 1000;   // 40 menit timeout (motion control 8–15m + margin)
+const POLL_FIRST_DELAY_MS = 5 * 60 * 1000; // first poll motion control: 5 menit
+const POLL_FIRST_DELAY_FAST_MS = 30 * 1000; // first poll model cepat (pixverse, kling_2_1_pro, veo, grok): 30 detik
+const POLL_MIN_INTERVAL_MS = 30 * 1000;    // minimum 30s antar poll (motion control)
+const POLL_MAX_INTERVAL_MS = 90 * 1000;    // maximum 90s antar poll (motion control)
+const POLL_MIN_INTERVAL_FAST_MS = 15 * 1000; // minimum 15s antar poll (model cepat)
+const POLL_MAX_INTERVAL_FAST_MS = 40 * 1000; // maximum 40s antar poll (model cepat)
+const POLL_HIDDEN_INTERVAL_MS = 5 * 60 * 1000; // saat tab tidak aktif
+const TASK_TIMEOUT_MS = 40 * 60 * 1000;   // 40 menit timeout
+
+/** Cek apakah engine ini motion control (proses lama 8-15 menit). */
+function isMotionControl(engine?: string): boolean {
+  return !engine || engine === 'kling';
+  // engine 'kling' = motion control. Selain itu (pixverse, kling_2_1_pro, veo, grok) = cepat.
+}
 
 // ─── Helper untuk turunkan UI-compat state dari tasks map ─────────────
 function deriveUiState(
@@ -553,7 +562,7 @@ function ensureBatchPoller(set: SetFn, get: () => GenerateState) {
 
     // Kumpulkan task yang layak di-poll:
     //  - status "polling"
-    //  - sudah lewat waktu firstPoll (5 menit setelah mulai)
+    //  - sudah lewat waktu firstPoll (5 menit untuk motion control, 30s untuk model cepat)
     //  - belum timeout (40 menit)
     const pollable: ActiveTask[] = [];
     const timedOut: string[] = [];
@@ -564,7 +573,8 @@ function ensureBatchPoller(set: SetFn, get: () => GenerateState) {
         timedOut.push(t.taskId);
         continue;
       }
-      if (elapsed < POLL_FIRST_DELAY_MS) continue;
+      const firstDelay = isMotionControl(t.engine) ? POLL_FIRST_DELAY_MS : POLL_FIRST_DELAY_FAST_MS;
+      if (elapsed < firstDelay) continue;
       pollable.push(t);
     }
 
@@ -603,19 +613,26 @@ function ensureBatchPoller(set: SetFn, get: () => GenerateState) {
   };
 
   const schedule = () => {
-    // Kalau tidak ada task aktif, schedule dengan interval lebih panjang
-    // (low-frequency idle poll) untuk antisipasi task baru di-submit.
-    const hasActive = Object.values(get().tasks).some((t) => t.status === "polling");
+    const activeTasks = Object.values(get().tasks).filter((t) => t.status === "polling");
+    const hasActive = activeTasks.length > 0;
     const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
 
     let delay: number;
     if (!hasActive) {
-      delay = POLL_MAX_INTERVAL_MS; // tidak ada yang dipoll, santai
+      delay = POLL_MAX_INTERVAL_MS;
     } else if (hidden) {
       delay = POLL_HIDDEN_INTERVAL_MS;
     } else {
-      const range = POLL_MAX_INTERVAL_MS - POLL_MIN_INTERVAL_MS;
-      delay = POLL_MIN_INTERVAL_MS + Math.floor(Math.random() * range);
+      // Gunakan interval tercepat dari semua task aktif.
+      // Kalau ada task model cepat → pakai interval cepat.
+      const hasFastTask = activeTasks.some((t) => !isMotionControl(t.engine));
+      if (hasFastTask) {
+        const range = POLL_MAX_INTERVAL_FAST_MS - POLL_MIN_INTERVAL_FAST_MS;
+        delay = POLL_MIN_INTERVAL_FAST_MS + Math.floor(Math.random() * range);
+      } else {
+        const range = POLL_MAX_INTERVAL_MS - POLL_MIN_INTERVAL_MS;
+        delay = POLL_MIN_INTERVAL_MS + Math.floor(Math.random() * range);
+      }
     }
     setTimeout(tick, delay);
   };
