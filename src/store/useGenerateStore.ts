@@ -29,6 +29,7 @@ interface GenerateFormValues {
   duration?: number;
   negative_prompt?: string;
   style?: string;
+  paygModel?: string;
 }
 
 export type PollingStatus = "idle" | "polling" | "completed" | "failed";
@@ -292,7 +293,8 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
     const { videoFile, imageFile, isSubmitting, tasks } = get();
 
     // ── Validasi file ──
-    if (values.engine === "kling") {
+    const isPaygNonKling = values.paygModel && !values.paygModel.startsWith('kling');
+    if (values.engine === "kling" && !isPaygNonKling) {
       if (!videoFile || !imageFile) return;
     } else {
       if (!imageFile) return;
@@ -354,9 +356,9 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       updateStep("validate", "success", "All checks passed");
       addLog("success", "✓ Input validation passed");
 
-      // ── Step 2: Upload Video (Skip for PixVerse) ──
+      // ── Step 2: Upload Video (Skip for PixVerse and PAYG non-kling) ──
       let videoBlobUrl: string | undefined;
-      if (values.engine === "kling" && videoFile) {
+      if (values.engine === "kling" && !isPaygNonKling && videoFile) {
         updateStep("upload_video", "running", "Uploading...");
         addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
 
@@ -444,6 +446,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           duration: values.duration,
           negative_prompt: values.negative_prompt,
           style: values.style,
+          paygModel: values.paygModel,
         }),
       });
 
@@ -482,6 +485,11 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
       addLog("info", "Waiting for Freepik to process your video...");
 
       // Tambahkan task ke map & fokuskan ke task baru ini.
+      // Determine the actual engine for polling purposes
+      const actualEngine = values.paygModel
+        ? (values.paygModel.startsWith('veo') ? 'veo' : values.paygModel.startsWith('grok') ? 'grok' : values.engine)
+        : values.engine;
+
       const startedAt = Date.now();
       set((s) => {
         const newTasks: Record<string, ActiveTask> = {
@@ -491,7 +499,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
             status: "polling",
             resultUrl: null,
             startedAt,
-            engine: values.engine,
+            engine: actualEngine,
           },
         };
         return {

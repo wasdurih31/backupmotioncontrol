@@ -1,7 +1,8 @@
 import { db } from '@/db';
-import { tasks } from '@/db/schema';
-import { eq, and, lt } from 'drizzle-orm';
+import { tasks, adminVideoKeys } from '@/db/schema';
+import { eq, and, lt, asc } from 'drizzle-orm';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
+import { decrypt } from '@/lib/crypto';
 
 // Result video berlaku 30 menit setelah selesai.
 export const RESULT_TTL_MS = 30 * 60 * 1000;
@@ -40,13 +41,18 @@ export async function cleanupExpiredTasks() {
 type DbTask = typeof tasks.$inferSelect;
 
 /**
- * Poll status 1 task ke Freepik dan sinkronkan ke DB.
+ * Poll status 1 task ke Freepik/Geminigen dan sinkronkan ke DB.
  * Mengembalikan task terbaru (sudah ter-update jika ada perubahan).
  */
 export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<DbTask> {
-  // Sudah final — tidak perlu hit Freepik.
+  // Sudah final — tidak perlu hit provider.
   if (task.status === 'success' || task.status === 'failed' || task.status === 'expired') {
     return task;
+  }
+
+  // Route to appropriate poller based on engine
+  if (task.engine === 'veo' || task.engine === 'grok') {
+    return pollGeminigenTask(task);
   }
 
   const pollingEndpoint = task.engine === 'pixverse'
@@ -128,6 +134,114 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
     return task;
   } catch (e) {
     console.warn(`[Poll ${task.id}] error:`, e);
+    return task;
+  }
+}
+
+/**
+ * Poll geminigen.ai task (veo / grok engines).
+ * Uses admin pool key since PAYG users don't have their own geminigen key.
+ */
+async function pollGeminigenTask(task: DbTask): Promise<DbTask> {
+  // Get geminigen pool key (sticky: oldest last_used_at)
+  const [poolKey] = await db.select()
+    .from(adminVideoKeys)
+    .where(
+      and(
+        eq(adminVideoKeys.provider, 'geminigen'),
+        eq(adminVideoKeys.status, 'active'),
+        eq(adminVideoKeys.isActive, true),
+      ),
+    )
+    .orderBy(asc(adminVideoKeys.lastUsedAt))
+    .limit(1);
+
+  if (!poolKey) {
+    console.warn(`[Poll ${task.id}] No active geminigen pool key available for polling.`);
+    return task;
+  }
+
+  let decryptedKey: string;
+  try {
+    decryptedKey = decrypt(poolKey.apiKeyEncrypted);
+  } catch (e) {
+    console.warn(`[Poll ${task.id}] Failed to decrypt geminigen pool key.`);
+    return task;
+  }
+
+  const endpoint = task.engine === 'veo'
+    ? `https://api.geminigen.ai/uapi/v1/video-gen/veo/${task.id}`
+    : `https://api.geminigen.ai/uapi/v1/video-gen/grok/${task.id}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${decryptedKey}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      return task;
+    }
+
+    const data = await res.json();
+    // Parse response: look for status and video URL
+    const remoteStatus = data?.data?.status || data?.status;
+    let newStatus: string = task.status;
+    let resultUrl: string | null = task.resultUrl;
+
+    if (remoteStatus === 'completed' || remoteStatus === 'success' || remoteStatus === 'COMPLETED') {
+      newStatus = 'success';
+      resultUrl = data?.data?.video_url || data?.data?.url || data?.video_url || data?.url
+        || data?.data?.result?.url || null;
+    } else if (remoteStatus === 'failed' || remoteStatus === 'error' || remoteStatus === 'FAILED') {
+      newStatus = 'failed';
+    } else {
+      newStatus = 'processing';
+    }
+
+    if (newStatus === task.status) {
+      return task;
+    }
+
+    if (newStatus === 'success') {
+      const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
+      await db.update(tasks).set({
+        status: 'success' as any,
+        resultUrl,
+        prompt: null,
+        expiresAt,
+        videoUrl: null,
+        imageUrl: null,
+      }).where(eq(tasks.id, task.id));
+      await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+      task.status = 'success' as any;
+      task.resultUrl = resultUrl;
+      task.prompt = null;
+      task.expiresAt = expiresAt;
+      task.videoUrl = null;
+      task.imageUrl = null;
+    } else if (newStatus === 'failed') {
+      await db.update(tasks).set({
+        status: 'failed' as any,
+        videoUrl: null,
+        imageUrl: null,
+      }).where(eq(tasks.id, task.id));
+      await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+      task.status = 'failed' as any;
+      task.videoUrl = null;
+      task.imageUrl = null;
+    } else {
+      await db.update(tasks).set({ status: newStatus as any }).where(eq(tasks.id, task.id));
+      task.status = newStatus as any;
+    }
+
+    return task;
+  } catch (e) {
+    console.warn(`[Poll ${task.id}] geminigen error:`, e);
     return task;
   }
 }

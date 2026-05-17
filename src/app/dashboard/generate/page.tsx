@@ -7,7 +7,8 @@ import * as z from "zod";
 import {
   UploadCloud, Image as ImageIcon, Video as VideoIcon, Loader2,
   CheckCircle2, X, Terminal, ChevronUp, ChevronDown,
-  Circle, XCircle, Sparkles, Download, Play, RefreshCw, Settings, Clock
+  Circle, XCircle, Sparkles, Download, Play, RefreshCw, Settings, Clock,
+  Wallet
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -351,6 +352,7 @@ const generateSchema = z.object({
   duration: z.number().optional(),
   negative_prompt: z.string().optional(),
   style: z.string().optional(),
+  paygModel: z.string().optional(),
 }).refine(data => {
   if (data.engine !== 'kling' && (!data.prompt || data.prompt.toString().trim() === '')) {
     return false;
@@ -497,6 +499,15 @@ export default function GenerateVideoPage() {
   const loadLatestTask = useGenerateStore((s) => s.loadLatestTask);
   const [hasMounted, setHasMounted] = useState(false);
 
+  // PAYG state
+  const [userProfile, setUserProfile] = useState<{ accountType: string; balance: number } | null>(null);
+  const [pricing, setPricing] = useState<Record<string, number>>({});
+  const [selectedPaygModel, setSelectedPaygModel] = useState<string>('kling_std');
+
+  const isPayg = userProfile?.accountType === 'payg';
+  const currentCost = isPayg ? (pricing[`price_${selectedPaygModel}`] || 0) : 0;
+  const balanceInsufficient = isPayg && userProfile && userProfile.balance < currentCost;
+
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
@@ -522,6 +533,34 @@ export default function GenerateVideoPage() {
 
   useEffect(() => { loadLatestTask(); setHasMounted(true); }, [loadLatestTask]);
 
+  // Fetch user profile and pricing for PAYG
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const res = await fetch('/api/user/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setUserProfile({ accountType: data.accountType, balance: data.balance });
+        }
+      } catch (_e) { /* ignore */ }
+    }
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    if (!isPayg) return;
+    async function fetchPricing() {
+      try {
+        const res = await fetch('/api/pricing');
+        if (res.ok) {
+          const data = await res.json();
+          setPricing(data.pricing || {});
+        }
+      } catch (_e) { /* ignore */ }
+    }
+    fetchPricing();
+  }, [isPayg]);
+
   const form = useForm<z.infer<typeof generateSchema>>({
     resolver: zodResolver(generateSchema),
     defaultValues: { 
@@ -533,7 +572,8 @@ export default function GenerateVideoPage() {
       resolution: "720p",
       duration: 5,
       negative_prompt: "",
-      style: ""
+      style: "",
+      paygModel: "kling_std",
     },
   });
 
@@ -571,15 +611,42 @@ export default function GenerateVideoPage() {
   async function onSubmit(values: z.infer<typeof generateSchema>) {
     console.log("Submit Clicked", values);
 
-    if (values.engine === "kling") {
-      if (!videoFile || !imageFile) {
+    if (isPayg) {
+      // PAYG: validate based on selected paygModel
+      const needsVideo = selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro';
+      if (needsVideo && (!videoFile || !imageFile)) {
         toast.error("Both a reference video AND a character image are required for Kling.");
         return;
       }
-    } else {
-      if (!imageFile) {
-        toast.error("A source image is required for PixVerse.");
+      if (!needsVideo && !imageFile) {
+        toast.error("A source image is required.");
         return;
+      }
+      if (balanceInsufficient) {
+        toast.error("Saldo tidak cukup untuk model ini.");
+        return;
+      }
+      // Override engine for PAYG based on paygModel
+      const engineMap: Record<string, "kling" | "pixverse" | "kling_2_1_pro"> = {
+        kling_std: "kling",
+        kling_pro: "kling",
+        veo_720: "kling", // engine field doesn't matter for PAYG, server uses paygModel
+        veo_1080: "kling",
+        grok_720: "kling",
+      };
+      values.engine = engineMap[selectedPaygModel] || "kling";
+      values.paygModel = selectedPaygModel;
+    } else {
+      if (values.engine === "kling") {
+        if (!videoFile || !imageFile) {
+          toast.error("Both a reference video AND a character image are required for Kling.");
+          return;
+        }
+      } else {
+        if (!imageFile) {
+          toast.error("A source image is required for PixVerse.");
+          return;
+        }
       }
     }
 
@@ -609,11 +676,77 @@ export default function GenerateVideoPage() {
               <div className="mb-8 space-y-4">
                 <h1 className="text-2xl font-bold tracking-tight">Generate Video</h1>
                 
+                {/* PAYG Balance Info */}
+                {isPayg && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-blue-300 font-medium">
+                        Saldo: Rp {(userProfile?.balance ?? 0).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    {currentCost > 0 && (
+                      <span className={`text-xs font-mono font-bold ${balanceInsufficient ? 'text-red-400' : 'text-green-400'}`}>
+                        Biaya: Rp {currentCost.toLocaleString('id-ID')}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-0.5">
                     <div className="w-1 h-3 bg-blue-500/80 rounded-full" />
                     <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground font-black">Model System</span>
                   </div>
+
+                  {isPayg ? (
+                    /* PAYG Model Selector */
+                    <Select
+                      value={selectedPaygModel}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setSelectedPaygModel(val);
+                        form.setValue('paygModel', val);
+                      }}
+                    >
+                      <SelectTrigger className="w-full bg-white/5 border-border/40 h-11 text-xs focus:ring-1 focus:ring-blue-500/50 transition-all hover:bg-white/[0.08] shadow-inner">
+                        <div className="flex items-center gap-2.5">
+                          <Sparkles className="w-4 h-4 text-blue-400" />
+                          <div className="flex flex-col items-start leading-tight">
+                            <span className="text-[10px] text-white/40 font-medium uppercase tracking-tighter">PAYG</span>
+                            <SelectValue placeholder="Select Model" />
+                          </div>
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40 shadow-2xl">
+                        <SelectGroup>
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling Motion Control</SelectLabel>
+                          <SelectItem value="kling_std" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Kling MC Std {pricing.price_kling_std ? `(Rp ${pricing.price_kling_std.toLocaleString('id-ID')})` : ''}
+                          </SelectItem>
+                          <SelectItem value="kling_pro" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Kling MC Pro {pricing.price_kling_pro ? `(Rp ${pricing.price_kling_pro.toLocaleString('id-ID')})` : ''}
+                          </SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Veo 3.1 Fast</SelectLabel>
+                          <SelectItem value="veo_720" className="text-xs py-2.5 cursor-pointer focus:bg-purple-500/10">
+                            Veo 3.1 Fast 720p {pricing.price_veo_720 ? `(Rp ${pricing.price_veo_720.toLocaleString('id-ID')})` : ''}
+                          </SelectItem>
+                          <SelectItem value="veo_1080" className="text-xs py-2.5 cursor-pointer focus:bg-purple-500/10">
+                            Veo 3.1 Fast 1080p {pricing.price_veo_1080 ? `(Rp ${pricing.price_veo_1080.toLocaleString('id-ID')})` : ''}
+                          </SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Grok AI</SelectLabel>
+                          <SelectItem value="grok_720" className="text-xs py-2.5 cursor-pointer focus:bg-green-500/10">
+                            Grok AI 720p {pricing.price_grok_720 ? `(Rp ${pricing.price_grok_720.toLocaleString('id-ID')})` : ''}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    /* BYOK Engine Selector */
                   <FormField control={form.control} name="engine" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger className="w-full bg-white/5 border-border/40 h-11 text-xs focus:ring-1 focus:ring-blue-500/50 transition-all hover:bg-white/[0.08] shadow-inner">
@@ -648,11 +781,12 @@ export default function GenerateVideoPage() {
                       </SelectContent>
                     </Select>
                   )} />
+                  )}
                 </div>
               </div>
 
-              <div className={form.watch("engine") === "kling" ? "grid grid-cols-2 gap-4" : "block"}>
-                {form.watch("engine") === "kling" && (
+              <div className={(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") ? "grid grid-cols-2 gap-4" : "block"}>
+                {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") && (
                   <UploadZone 
                     type="video" 
                     file={videoFile} 
@@ -676,7 +810,7 @@ export default function GenerateVideoPage() {
                 <FormField control={form.control} name="prompt" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
-                      Text Prompt {form.watch("engine") === "kling" ? "(Optional)" : <span className="text-red-500">*</span>}
+                      Text Prompt {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") ? "(Optional)" : <span className="text-red-500">*</span>}
                     </FormLabel>
                     <FormControl>
                       <Textarea 
@@ -690,6 +824,8 @@ export default function GenerateVideoPage() {
                   </FormItem>
                 )} />
 
+                {/* Configuration Card — only show for BYOK or PAYG kling models */}
+                {(!isPayg || selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') && (
                 <Card className="bg-card/20 border-border/40 overflow-hidden backdrop-blur-xl shadow-2xl">
                   <CardHeader className="px-5 py-4 border-b border-border/40 bg-white/5 flex flex-row items-center justify-between">
                     <CardTitle className="text-[11px] uppercase tracking-[0.2em] font-black flex items-center gap-2.5 text-white/90">
@@ -945,6 +1081,7 @@ export default function GenerateVideoPage() {
                     ) : null}
                   </CardContent>
                 </Card>
+                )}
               </div>
 
               <div className="pt-4 pb-4 md:static md:p-0 space-y-2">
@@ -964,10 +1101,12 @@ export default function GenerateVideoPage() {
                   type="submit"
                   size="lg"
                   className="bg-blue-600 text-white hover:bg-blue-500 font-bold px-8 w-full gap-2 relative overflow-hidden group shadow-xl shadow-blue-500/10 h-12"
-                  disabled={isSubmitting || slotsFull}
+                  disabled={isSubmitting || slotsFull || !!balanceInsufficient}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="h-5 w-5 animate-spin" /> UPLOADING...</>
+                  ) : balanceInsufficient ? (
+                    <><Wallet className="h-5 w-5" /> SALDO TIDAK CUKUP</>
                   ) : slotsFull ? (
                     <><Clock className="h-5 w-5" /> SLOT PENUH ({activeCount}/{MAX_CONCURRENT_TASKS})</>
                   ) : (

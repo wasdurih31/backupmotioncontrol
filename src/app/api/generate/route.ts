@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import { db } from '@/db';
-import { users, tasks } from '@/db/schema';
-import { and, eq, inArray, sql, gt } from 'drizzle-orm';
+import { users, tasks, adminVideoKeys, balanceTransactions, appSettings } from '@/db/schema';
+import { and, eq, inArray, sql, gt, asc } from 'drizzle-orm';
 import { runFreepikCall } from '@/lib/freepikQueue';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
+import { decrypt } from '@/lib/crypto';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'universeai-super-secret-key-2026');
 
@@ -59,9 +60,7 @@ export async function POST(req: Request) {
     }
 
     if (accountCheck.accountType === 'payg') {
-      return NextResponse.json({
-        error: 'Fitur generate untuk akun PAYG sedang dalam pengembangan.',
-      }, { status: 400 });
+      return handlePaygGenerate(req, session.id);
     }
 
     if (accountCheck.accountType === 'byok') {
@@ -251,4 +250,320 @@ async function cleanupBlobs(urls: (string | null | undefined)[]) {
       }
     }
   }
+}
+
+// ─── PAYG Model Definitions ──────────────────────────────────────────
+type PaygModel = 'kling_std' | 'kling_pro' | 'veo_720' | 'veo_1080' | 'grok_720';
+
+const PAYG_MODEL_CONFIG: Record<PaygModel, {
+  provider: 'freepik' | 'geminigen';
+  settingsKey: string;
+  source: string;
+  engine: string;
+  model: string;
+}> = {
+  kling_std: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_std',
+    source: 'payg_freepik_pool',
+    engine: 'kling',
+    model: 'motion_control_std',
+  },
+  kling_pro: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_pro',
+    source: 'payg_freepik_pool',
+    engine: 'kling',
+    model: 'motion_control_pro',
+  },
+  veo_720: {
+    provider: 'geminigen',
+    settingsKey: 'price_veo_720',
+    source: 'payg_geminigen_pool',
+    engine: 'veo',
+    model: 'veo-3.1-fast',
+  },
+  veo_1080: {
+    provider: 'geminigen',
+    settingsKey: 'price_veo_1080',
+    source: 'payg_geminigen_pool',
+    engine: 'veo',
+    model: 'veo-3.1-fast',
+  },
+  grok_720: {
+    provider: 'geminigen',
+    settingsKey: 'price_grok_720',
+    source: 'payg_geminigen_pool',
+    engine: 'grok',
+    model: 'grok',
+  },
+};
+
+/** Handle PAYG video generation flow. */
+async function handlePaygGenerate(req: Request, userId: string) {
+  const {
+    videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine, paygModel,
+  } = await req.json();
+
+  // ── Validate paygModel ──
+  if (!paygModel || !PAYG_MODEL_CONFIG[paygModel as PaygModel]) {
+    return NextResponse.json({ error: 'Model PAYG tidak valid.' }, { status: 400 });
+  }
+
+  const config = PAYG_MODEL_CONFIG[paygModel as PaygModel];
+
+  if (!imageUrl) {
+    return NextResponse.json({ error: 'Image URL is required.' }, { status: 400 });
+  }
+  if ((paygModel === 'kling_std' || paygModel === 'kling_pro') && !videoUrl) {
+    return NextResponse.json({ error: 'Video URL is required for Kling Motion Control.' }, { status: 400 });
+  }
+
+  // ── Concurrency check ──
+  const cutoff = new Date(Date.now() - TASK_MAX_AGE_MS);
+  await db.update(tasks).set({ status: 'failed' as any })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        inArray(tasks.status, ['queued', 'processing']),
+        sql`${tasks.createdAt} <= ${cutoff}`,
+      ),
+    );
+
+  const preCount = await countActive(userId);
+  if (preCount >= MAX_CONCURRENT_PER_USER) {
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({
+      error: `Batas maksimum ${MAX_CONCURRENT_PER_USER} proses berjalan tercapai. Tunggu salah satu selesai.`,
+      code: 'TOO_MANY_ACTIVE',
+      active: preCount,
+      limit: MAX_CONCURRENT_PER_USER,
+    }, { status: 429 });
+  }
+
+  // ── Get cost from appSettings ──
+  const [setting] = await db.select({ value: appSettings.value })
+    .from(appSettings)
+    .where(eq(appSettings.key, config.settingsKey))
+    .limit(1);
+
+  const cost = parseInt(setting?.value || '0', 10);
+  if (!cost || cost <= 0) {
+    return NextResponse.json({ error: 'Harga model belum dikonfigurasi. Hubungi admin.' }, { status: 500 });
+  }
+
+  // ── Check balance ──
+  const [userRow] = await db.select({
+    balance: users.balance,
+    totalGenerate: users.totalGenerate,
+  }).from(users).where(eq(users.id, userId)).limit(1);
+
+  if (!userRow || userRow.balance < cost) {
+    await cleanupBlobs([videoUrl, imageUrl]);
+    const bal = userRow?.balance ?? 0;
+    return NextResponse.json({
+      error: `Saldo tidak cukup. Saldo: Rp ${bal.toLocaleString('id-ID')}, Biaya: Rp ${cost.toLocaleString('id-ID')}`,
+    }, { status: 402 });
+  }
+
+  // ── Get pool API key (sticky failover) ──
+  const [poolKey] = await db.select()
+    .from(adminVideoKeys)
+    .where(
+      and(
+        eq(adminVideoKeys.provider, config.provider),
+        eq(adminVideoKeys.status, 'active'),
+        eq(adminVideoKeys.isActive, true),
+      ),
+    )
+    .orderBy(asc(adminVideoKeys.lastUsedAt))
+    .limit(1);
+
+  if (!poolKey) {
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({
+      error: 'Tidak ada API key tersedia. Hubungi admin.',
+    }, { status: 503 });
+  }
+
+  let decryptedKey: string;
+  try {
+    decryptedKey = decrypt(poolKey.apiKeyEncrypted);
+  } catch (e) {
+    console.error('[PAYG] Failed to decrypt pool key:', e);
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({ error: 'Gagal mendekripsi API key pool. Hubungi admin.' }, { status: 500 });
+  }
+
+  // ── Call provider API ──
+  let taskId: string | null = null;
+  let apiResponse: Response;
+
+  try {
+    if (config.provider === 'freepik') {
+      // Kling Motion Control via Freepik
+      const endpoint = paygModel === 'kling_pro'
+        ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
+        : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
+
+      const payload = {
+        video_url: videoUrl,
+        image_url: imageUrl,
+        prompt: prompt || '',
+        character_orientation: character_orientation || 'video',
+        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+      };
+
+      apiResponse = await runFreepikCall(() => fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'x-freepik-api-key': decryptedKey,
+        },
+        body: JSON.stringify(payload),
+      }));
+    } else {
+      // Geminigen (veo / grok)
+      const endpoint = config.engine === 'veo'
+        ? 'https://api.geminigen.ai/uapi/v1/video-gen/veo'
+        : 'https://api.geminigen.ai/uapi/v1/video-gen/grok';
+
+      const resolution = paygModel === 'veo_1080' ? '1080p' : '720p';
+      const payload = {
+        model: config.engine === 'veo' ? 'veo-3.1-fast' : 'grok',
+        image_url: imageUrl,
+        prompt: prompt || '',
+        resolution,
+        duration: 5,
+      };
+
+      apiResponse = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${decryptedKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!apiResponse.ok) {
+      const errorData = await apiResponse.json().catch(() => ({ message: `HTTP ${apiResponse.status}` }));
+      console.error(`[PAYG] API Error (${config.provider}):`, JSON.stringify(errorData, null, 2));
+
+      // Mark key based on HTTP status
+      const newStatus = apiResponse.status === 429 ? 'limit_reached' : 'error';
+      await db.update(adminVideoKeys).set({
+        status: newStatus,
+        lastError: JSON.stringify(errorData).slice(0, 500),
+        errorCount: sql`${adminVideoKeys.errorCount} + 1`,
+      }).where(eq(adminVideoKeys.id, poolKey.id));
+
+      await cleanupBlobs([videoUrl, imageUrl]);
+      return NextResponse.json({
+        error: `API ${config.provider} error: ${errorData.message || errorData.error || JSON.stringify(errorData)}`,
+      }, { status: apiResponse.status >= 500 ? 502 : apiResponse.status });
+    }
+
+    const responseData = await apiResponse.json();
+
+    // Extract task_id from response
+    taskId = responseData?.data?.task_id || responseData?.task_id || null;
+    if (!taskId) {
+      console.error(`[PAYG] No task_id in response:`, responseData);
+      await cleanupBlobs([videoUrl, imageUrl]);
+      return NextResponse.json({ error: 'Invalid response from provider API (no task_id).' }, { status: 500 });
+    }
+  } catch (e: any) {
+    console.error(`[PAYG] Network error calling ${config.provider}:`, e);
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({ error: `Network error: ${e.message}` }, { status: 502 });
+  }
+
+  // ── API call succeeded — now charge balance atomically ──
+  const [deducted] = await db.update(users)
+    .set({ balance: sql`${users.balance} - ${cost}` })
+    .where(and(eq(users.id, userId), sql`${users.balance} >= ${cost}`))
+    .returning({ balance: users.balance });
+
+  if (!deducted) {
+    // Race condition: balance became insufficient between check and deduction
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({
+      error: 'Saldo tidak cukup (race condition). Silakan coba lagi.',
+    }, { status: 402 });
+  }
+
+  // ── Insert balance transaction ──
+  const modelLabel = paygModel.replace('_', ' ').toUpperCase();
+  await db.insert(balanceTransactions).values({
+    id: crypto.randomUUID(),
+    userId,
+    type: 'usage',
+    amount: -cost,
+    balanceBefore: deducted.balance + cost,
+    balanceAfter: deducted.balance,
+    description: `Generate ${modelLabel}`,
+    taskId,
+  });
+
+  // ── Insert task to DB ──
+  await db.insert(tasks).values({
+    id: taskId,
+    userId,
+    prompt: prompt || null,
+    videoUrl: videoUrl || null,
+    imageUrl,
+    characterOrientation: character_orientation || null,
+    engine: config.engine,
+    model: config.model,
+    status: 'processing',
+    costRupiah: cost,
+    source: config.source,
+  });
+
+  // ── Post-check concurrency race ──
+  const postCount = await countActive(userId);
+  if (postCount > MAX_CONCURRENT_PER_USER) {
+    console.warn(`[PAYG Race] User ${userId} post-insert count=${postCount}, rolling back ${taskId}`);
+    await db.delete(tasks).where(eq(tasks.id, taskId));
+    // Refund balance
+    await db.update(users).set({ balance: sql`${users.balance} + ${cost}` }).where(eq(users.id, userId));
+    await db.insert(balanceTransactions).values({
+      id: crypto.randomUUID(),
+      userId,
+      type: 'refund',
+      amount: cost,
+      balanceBefore: deducted.balance,
+      balanceAfter: deducted.balance + cost,
+      description: `Refund ${modelLabel} (race condition)`,
+      taskId,
+    });
+    await cleanupBlobs([videoUrl, imageUrl]);
+    return NextResponse.json({
+      error: `Batas ${MAX_CONCURRENT_PER_USER} proses bersamaan tercapai (race). Silakan coba lagi.`,
+      code: 'TOO_MANY_ACTIVE',
+      active: postCount,
+      limit: MAX_CONCURRENT_PER_USER,
+    }, { status: 429 });
+  }
+
+  // ── Mark key as used ──
+  await db.update(adminVideoKeys).set({
+    usageCount: sql`${adminVideoKeys.usageCount} + 1`,
+    lastUsedAt: new Date(),
+  }).where(eq(adminVideoKeys.id, poolKey.id));
+
+  // ── Increment totalGenerate ──
+  await db.update(users)
+    .set({ totalGenerate: (userRow.totalGenerate || 0) + 1 })
+    .where(eq(users.id, userId));
+
+  return NextResponse.json({
+    success: true,
+    taskId,
+    active: postCount,
+    limit: MAX_CONCURRENT_PER_USER,
+  });
 }

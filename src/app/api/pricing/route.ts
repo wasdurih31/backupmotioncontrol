@@ -1,37 +1,35 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { appSettings } from '@/db/schema';
+import { inArray } from 'drizzle-orm';
+
+const PRICING_KEYS = [
+  'price_kling_std',
+  'price_kling_pro',
+  'price_veo_720',
+  'price_veo_1080',
+  'price_grok_720',
+];
 
 /**
- * GET /api/pricing — public endpoint (no auth required).
- * Return harga terbaru dari app_settings untuk ditampilkan di landing page.
+ * GET /api/pricing
+ * Returns PAYG model pricing from appSettings.
+ * Public endpoint (no auth required) — prices are not sensitive.
  */
 export async function GET() {
   try {
-    const rows = await db.select().from(appSettings);
-    const settings: Record<string, string> = {};
+    const rows = await db.select({ key: appSettings.key, value: appSettings.value })
+      .from(appSettings)
+      .where(inArray(appSettings.key, PRICING_KEYS));
+
+    const pricing: Record<string, number> = {};
     for (const row of rows) {
-      settings[row.key] = row.value || '';
+      pricing[row.key] = parseInt(row.value || '0', 10);
     }
 
-    return NextResponse.json({
-      kling_std: parseInt(settings.price_kling_std) || 650,
-      kling_pro: parseInt(settings.price_kling_pro) || 1000,
-      veo_720: parseInt(settings.price_veo_720) || 600,
-      veo_1080: parseInt(settings.price_veo_1080) || 1000,
-      grok_720: parseInt(settings.price_grok_720) || 800,
-      whatsapp_link: settings.whatsapp_admin_link || '',
-      byok_link: settings.byok_signup_link || '',
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-      },
-    });
+    return NextResponse.json({ pricing });
   } catch (error) {
-    // Fallback defaults kalau DB error
-    return NextResponse.json({
-      kling_std: 650, kling_pro: 1000, veo_720: 600, veo_1080: 1000, grok_720: 800,
-      whatsapp_link: '', byok_link: '',
-    });
+    console.error('Pricing API Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

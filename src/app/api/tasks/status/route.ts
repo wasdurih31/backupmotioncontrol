@@ -71,9 +71,38 @@ export async function GET(req: Request) {
 
     let apiKey: string | null = null;
     if (needsPolling) {
-      const u = await db.select({ apiKey: users.apiKey }).from(users)
-        .where(eq(users.id, session.id)).limit(1);
-      if (u.length && u[0].apiKey) apiKey = u[0].apiKey;
+      // For PAYG users with freepik pool tasks, get pool key instead of user key
+      const needsFreepikPolling = rows.some(
+        (t) => t.status !== 'success' && t.status !== 'failed' && t.status !== 'expired'
+          && t.engine !== 'veo' && t.engine !== 'grok',
+      );
+
+      if (needsFreepikPolling) {
+        const u = await db.select({ apiKey: users.apiKey, accountType: users.accountType }).from(users)
+          .where(eq(users.id, session.id)).limit(1);
+        if (u.length) {
+          if (u[0].accountType === 'payg') {
+            // PAYG: get freepik pool key for polling
+            const { adminVideoKeys } = await import('@/db/schema');
+            const { asc } = await import('drizzle-orm');
+            const { decrypt } = await import('@/lib/crypto');
+            const [poolKey] = await db.select()
+              .from(adminVideoKeys)
+              .where(and(
+                eq(adminVideoKeys.provider, 'freepik'),
+                eq(adminVideoKeys.status, 'active'),
+                eq(adminVideoKeys.isActive, true),
+              ))
+              .orderBy(asc(adminVideoKeys.lastUsedAt))
+              .limit(1);
+            if (poolKey) {
+              try { apiKey = decrypt(poolKey.apiKeyEncrypted); } catch (_e) { /* ignore */ }
+            }
+          } else if (u[0].apiKey) {
+            apiKey = u[0].apiKey;
+          }
+        }
+      }
     }
 
     // Poll sekuensial. Untuk task yang sudah final, helper mengembalikan
