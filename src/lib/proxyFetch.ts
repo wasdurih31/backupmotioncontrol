@@ -189,7 +189,7 @@ export async function freepikFetch(
 
     if (!isVerified) {
       console.error(`[Proxy] 🚨 Semua ${maxPingAttempts} IP proxy sibuk atau diblokir (403). Mencegah pengiriman tanpa proxy!`);
-      throw new Error('Semua ip proxy sibuk atau terblokir. Silakan coba lagi nanti.');
+      throw new Error('Sistem jaringan sedang sibuk. Silakan coba beberapa saat lagi.');
     }
   }
 
@@ -232,7 +232,7 @@ export async function freepikFetch(
       // Network error through proxy — mark and throw
       await markProxyError(e.message || 'Network error');
       console.error(`[Proxy] ❌ Proxy network error (${elapsed}ms): ${e.message}`);
-      throw new Error(`Proxy network error: ${e.message}. Pengiriman langsung dilarang.`);
+      throw new Error('Terjadi gangguan jaringan internal. Silakan coba lagi nanti.');
     }
   }
 
@@ -241,5 +241,5 @@ export async function freepikFetch(
   console.error(`[Proxy] 🚨 NO ACTIVE PROXIES — Direct call to Freepik is BLOCKED.`);
   console.log(`[Proxy] 📡 ${method} ${urlStr.split('?')[0]}`);
   console.log('═══════════════════════════════════════════════════════');
-  throw new Error('Tidak ada proxy aktif yang tersedia. Pengiriman langsung ke Freepik dilarang.');
+  throw new Error('Sistem jaringan belum siap. Silakan coba lagi nanti.');
 }
