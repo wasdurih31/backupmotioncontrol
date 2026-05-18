@@ -164,7 +164,7 @@ export default function Home() {
                   <span className="text-[#e5e5e5] font-semibold text-sm">Veo 3.1 Fast</span>
                 </div>
                 <div className="col-span-2 px-4 py-5">
-                  <span className="text-[#888] text-sm font-mono">10 Detik</span>
+                  <span className="text-[#888] text-sm font-mono">8 Detik</span>
                 </div>
                 <div className="col-span-3 px-4 py-5">
                   <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 15.000 / generate</span>
