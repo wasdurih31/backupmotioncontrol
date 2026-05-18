@@ -152,9 +152,9 @@ export async function freepikFetch(
     } catch { /* not JSON */ }
   }
 
-  // ── Pre-check IP for POST requests ──
+  // ── Pre-check IP ──
   // Ping api.magnific.com to ensure the IP isn't blocked by Cloudflare (403) before wasting API quota
-  if (session && method === 'POST') {
+  if (session) {
     let pingAttempts = 0;
     let isVerified = false;
     const maxPingAttempts = 10;
@@ -229,18 +229,17 @@ export async function freepikFetch(
       return response;
     } catch (e: any) {
       const elapsed = Date.now() - startTime;
-      // Network error through proxy — mark and retry direct
+      // Network error through proxy — mark and throw
       await markProxyError(e.message || 'Network error');
       console.error(`[Proxy] ❌ Proxy network error (${elapsed}ms): ${e.message}`);
-      console.warn(`[Proxy] ⚡ Falling back to DIRECT call (no proxy)`);
-      return fetch(url, init);
+      throw new Error(`Proxy network error: ${e.message}. Pengiriman langsung dilarang.`);
     }
   }
 
-  // No proxy configured — direct call
+  // No proxy configured — strictly block direct call
   console.log('═══════════════════════════════════════════════════════');
-  console.warn(`[Proxy] ⚠️ NO ACTIVE PROXIES — calling Freepik DIRECTLY`);
+  console.error(`[Proxy] 🚨 NO ACTIVE PROXIES — Direct call to Freepik is BLOCKED.`);
   console.log(`[Proxy] 📡 ${method} ${urlStr.split('?')[0]}`);
   console.log('═══════════════════════════════════════════════════════');
-  return fetch(url, init);
+  throw new Error('Tidak ada proxy aktif yang tersedia. Pengiriman langsung ke Freepik dilarang.');
 }
