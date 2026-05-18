@@ -245,19 +245,19 @@ export default function Home() {
 
               <div className="space-y-5 flex-1">
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.1em] text-[#666] font-semibold mb-3">Model AI tersedia</p>
+                  <p className="text-[10px] uppercase tracking-[0.1em] text-[#666] font-semibold mb-3">Model AI (Harga per video)</p>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Std</span><span className="font-mono text-white">{fmtRp(p.kling_std)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Pro</span><span className="font-mono text-white">{fmtRp(p.kling_pro)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 720p</span><span className="font-mono text-white">{fmtRp(p.veo_720)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 1080p</span><span className="font-mono text-white">{fmtRp(p.veo_1080)}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Grok AI 720p</span><span className="font-mono text-white">{fmtRp(p.grok_720)}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Std</span><span className="font-mono text-white">{fmtRp(p.kling_std)} <span className="text-[10px] text-[#666] font-sans">/ video</span></span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Kling Motion Control Pro</span><span className="font-mono text-white">{fmtRp(p.kling_pro)} <span className="text-[10px] text-[#666] font-sans">/ video</span></span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 720p</span><span className="font-mono text-white">{fmtRp(p.veo_720)} <span className="text-[10px] text-[#666] font-sans">/ video</span></span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Veo 3.1 Fast 1080p</span><span className="font-mono text-white">{fmtRp(p.veo_1080)} <span className="text-[10px] text-[#666] font-sans">/ video</span></span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#ccc]">Grok AI 720p</span><span className="font-mono text-white">{fmtRp(p.grok_720)} <span className="text-[10px] text-[#666] font-sans">/ video</span></span></div>
                   </div>
                 </div>
 
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.1em] text-[#666] font-semibold mb-3">Harga</p>
-                  <p className="text-sm">{fmtRp(minPrice)} - {fmtRp(maxPrice)} per generate</p>
+                  <p className="text-sm">{fmtRp(minPrice)} - {fmtRp(maxPrice)} per video</p>
                 </div>
 
                 <div>
