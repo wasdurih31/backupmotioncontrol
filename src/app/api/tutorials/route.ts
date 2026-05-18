@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db } from '@/db';
-import { tutorials } from '@/db/schema';
-import { desc } from 'drizzle-orm';
+import { tutorials, users } from '@/db/schema';
+import { desc, eq, or, inArray } from 'drizzle-orm';
 
 export async function GET() {
   const session = await getSession();
@@ -11,8 +11,23 @@ export async function GET() {
   }
 
   try {
+    // Get user's account type to filter tutorials by visibility
+    const [user] = await db.select({ accountType: users.accountType })
+      .from(users)
+      .where(eq(users.id, session.id))
+      .limit(1);
+
+    const accountType = user?.accountType || 'byok';
+
+    // Filter: show tutorials where visibility = 'all' OR visibility matches user's accountType
     const allTutorials = await db.select()
       .from(tutorials)
+      .where(
+        or(
+          eq(tutorials.visibility, 'all'),
+          eq(tutorials.visibility, accountType),
+        )
+      )
       .orderBy(desc(tutorials.createdAt));
 
     return NextResponse.json({ data: allTutorials });

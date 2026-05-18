@@ -41,6 +41,8 @@ interface User {
   accessCode: string;
   apiKey: string | null;
   role: string;
+  accountType: string;
+  balance: number;
   totalGenerate: number;
   createdAt: string;
   lastLoginAt: string | null;
@@ -56,6 +58,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [accountTypeFilter, setAccountTypeFilter] = useState<"all" | "byok" | "payg">("all");
   const [hasMounted, setHasMounted] = useState(false);
   
   // Sorting State
@@ -245,6 +248,10 @@ export default function AdminUsersPage() {
   });
 
   const filteredUsers = sortedUsers.filter(user => {
+    // Account type filter
+    if (accountTypeFilter !== "all" && user.accountType !== accountTypeFilter) return false;
+    // Search filter
+    if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
     return (user.email?.toLowerCase().includes(searchLower) || 
             user.phone?.toLowerCase().includes(searchLower) || 
@@ -301,8 +308,8 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex items-center gap-4 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input 
             placeholder="Search users..." 
@@ -310,6 +317,30 @@ export default function AdminUsersPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+        <div className="flex items-center gap-1.5 bg-card/20 border border-border/50 rounded-xl p-1">
+          {(["all", "byok", "payg"] as const).map((type) => {
+            const isActive = accountTypeFilter === type;
+            const count = type === "all" ? users.length : users.filter(u => u.accountType === type).length;
+            return (
+              <button
+                key={type}
+                onClick={() => setAccountTypeFilter(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? type === 'byok' ? 'bg-blue-500/20 text-blue-400 shadow-sm' 
+                    : type === 'payg' ? 'bg-purple-500/20 text-purple-400 shadow-sm'
+                    : 'bg-white/10 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                }`}
+              >
+                {type === 'all' ? 'All' : type.toUpperCase()}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/10' : 'bg-white/5'
+                }`}>{count}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -352,6 +383,11 @@ export default function AdminUsersPage() {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{user.email || user.phone}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                            user.accountType === 'payg' 
+                              ? 'bg-purple-500/20 text-purple-400' 
+                              : 'bg-blue-500/20 text-blue-400'
+                          }`}>{user.accountType === 'payg' ? 'PAYG' : 'BYOK'}</span>
                           {!user.isActive && <span className="bg-red-500/20 text-red-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">BANNED</span>}
                         </div>
                         <span className="text-[10px] text-muted-foreground font-mono">Registered: {user.createdAt.split('T')[0]}</span>

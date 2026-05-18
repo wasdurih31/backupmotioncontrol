@@ -54,6 +54,8 @@ export const tutorials = pgTable('tutorials', {
   mediaUrl: text('media_url'),
   mediaType: varchar('media_type', { length: 20 }),
   link: text('link'),
+  // Visibility: 'all' (semua user), 'byok' (hanya BYOK), 'payg' (hanya PAYG)
+  visibility: varchar('visibility', { length: 20 }).notNull().default('all'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { title, content, mediaUrl, mediaType, link } = await req.json();
+    const { title, content, mediaUrl, mediaType, link, visibility } = await req.json();
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       mediaUrl: mediaUrl || null,
       mediaType: mediaType || null,
       link: link || null,
+      visibility: visibility || 'all',
     });
 
     return NextResponse.json({ success: true, id });
@@ -60,7 +61,7 @@ export async function PUT(req: Request) {
   }
 
   try {
-    const { id, title, content, mediaUrl, mediaType, link } = await req.json();
+    const { id, title, content, mediaUrl, mediaType, link, visibility } = await req.json();
 
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
@@ -73,6 +74,7 @@ export async function PUT(req: Request) {
     if (mediaUrl !== undefined) updateData.mediaUrl = mediaUrl;
     if (mediaType !== undefined) updateData.mediaType = mediaType;
     if (link !== undefined) updateData.link = link;
+    if (visibility !== undefined) updateData.visibility = visibility;
 
     await db.update(tutorials).set(updateData).where(eq(tutorials.id, id));
 
