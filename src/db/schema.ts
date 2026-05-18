@@ -134,3 +134,19 @@ export const appSettings = pgTable('app_settings', {
   value: text('value'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// ─── Proxy accounts for routing API calls through residential proxies ─
+// Format: protocol://username:password@host:port
+// Used for Freepik API calls to avoid IP blocks.
+// Sticky mode: each proxy is "locked" to a session for ~30 min.
+export const proxyAccounts = pgTable('proxy_accounts', {
+  id: text('id').primaryKey(),
+  // Full proxy URL: http://user:pass@geo.iproyal.com:12321
+  proxyUrl: text('proxy_url').notNull(),
+  label: varchar('label', { length: 100 }),
+  isActive: boolean('is_active').default(true).notNull(),
+  usageCount: integer('usage_count').default(0).notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

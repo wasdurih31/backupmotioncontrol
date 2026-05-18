@@ -18,7 +18,8 @@ import {
   KeyRound,
   Video,
   Wallet,
-  Settings
+  Settings,
+  Globe
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,6 +31,7 @@ const adminLinks = [
   { name: "Tutorials", href: "/admin/tutorials", icon: BookOpen },
   { name: "AI Keys", href: "/admin/ai-keys", icon: KeyRound },
   { name: "Video Keys", href: "/admin/video-keys", icon: Video },
+  { name: "Proxies", href: "/admin/proxies", icon: Globe },
   { name: "Top Up User", href: "/admin/topup", icon: Wallet },
   { name: "Settings", href: "/admin/settings", icon: Settings },
   { name: "Database Backup", href: "/admin/backup", icon: Database },
