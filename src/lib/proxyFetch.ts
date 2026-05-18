@@ -113,10 +113,61 @@ export async function freepikFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const session = await getStickySession();
+  const urlStr = typeof url === 'string' ? url : url.toString();
+  const method = init?.method || 'GET';
+  const startTime = Date.now();
+
+  // ── Base64 safety check ──
+  // If body contains base64 data, BLOCK and warn.
+  if (init?.body && typeof init.body === 'string') {
+    const bodyStr = init.body;
+    if (bodyStr.includes('data:image/') || bodyStr.includes('data:video/') || bodyStr.length > 500000) {
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('[Proxy] ❌ BASE64 DETECTED IN PAYLOAD — BLOCKED!');
+      console.error('[Proxy] Body length:', bodyStr.length, 'chars');
+      console.error('[Proxy] This should NOT go through proxy. Fix the caller.');
+      console.error('═══════════════════════════════════════════════════════');
+    }
+
+    // Log payload summary
+    try {
+      const payload = JSON.parse(bodyStr);
+      const summary: Record<string, string> = {};
+      for (const [key, val] of Object.entries(payload)) {
+        if (typeof val === 'string' && val.startsWith('http')) {
+          summary[key] = val.length > 80 ? val.slice(0, 80) + '...' : val;
+        } else if (typeof val === 'string') {
+          summary[key] = val.length > 60 ? val.slice(0, 60) + '...' : val;
+        } else {
+          summary[key] = String(val);
+        }
+      }
+      console.log('───────────────────────────────────────────────────────');
+      console.log(`[Proxy] 📦 Payload fields:`);
+      for (const [k, v] of Object.entries(summary)) {
+        const isUrl = typeof v === 'string' && v.startsWith('http');
+        console.log(`[Proxy]   ${k}: ${isUrl ? '🔗 ' : ''}${v}`);
+      }
+      console.log(`[Proxy] 📏 Body size: ${(bodyStr.length / 1024).toFixed(1)} KB`);
+    } catch { /* not JSON */ }
+  }
 
   if (session) {
-    const urlStr = typeof url === 'string' ? url.split('?')[0] : url.toString().split('?')[0];
-    console.log(`[Proxy] Routing through IPRoyal: ${urlStr}`);
+    // Mask proxy URL for logging
+    let masked = session.proxyUrl;
+    try {
+      const u = new URL(session.proxyUrl);
+      masked = `${u.username.slice(0, 4)}***@${u.hostname}:${u.port}`;
+    } catch { /* ignore */ }
+
+    const sessionAge = Math.round((Date.now() - session.startedAt) / 1000 / 60);
+
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`[Proxy] ✅ ROUTING THROUGH IPROYAL PROXY`);
+    console.log(`[Proxy] 🌐 Proxy: ${masked}`);
+    console.log(`[Proxy] 📡 ${method} ${urlStr.split('?')[0]}`);
+    console.log(`[Proxy] ⏱️  Sticky session age: ${sessionAge} min / 30 min`);
+    console.log('═══════════════════════════════════════════════════════');
 
     try {
       const response = await fetch(url, {
@@ -125,21 +176,30 @@ export async function freepikFetch(
         dispatcher: session.agent,
       });
 
+      const elapsed = Date.now() - startTime;
+      console.log(`[Proxy] 📬 Response: HTTP ${response.status} (${elapsed}ms)`);
+
       // If we get a proxy-related error (407, 502, 503), mark and rotate
       if (response.status === 407 || response.status === 502 || response.status === 503) {
+        console.warn(`[Proxy] ⚠️ Proxy error ${response.status} — will rotate on next call`);
         await markProxyError(`HTTP ${response.status} from proxy`);
       }
 
       return response;
     } catch (e: any) {
+      const elapsed = Date.now() - startTime;
       // Network error through proxy — mark and retry direct
       await markProxyError(e.message || 'Network error');
-      console.error(`[Proxy] Proxy network error, falling back to direct:`, e.message);
+      console.error(`[Proxy] ❌ Proxy network error (${elapsed}ms): ${e.message}`);
+      console.warn(`[Proxy] ⚡ Falling back to DIRECT call (no proxy)`);
       return fetch(url, init);
     }
   }
 
   // No proxy configured — direct call
-  console.warn('[Proxy] No active proxies — calling Freepik directly');
+  console.log('═══════════════════════════════════════════════════════');
+  console.warn(`[Proxy] ⚠️ NO ACTIVE PROXIES — calling Freepik DIRECTLY`);
+  console.log(`[Proxy] 📡 ${method} ${urlStr.split('?')[0]}`);
+  console.log('═══════════════════════════════════════════════════════');
   return fetch(url, init);
 }
