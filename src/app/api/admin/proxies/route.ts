@@ -17,6 +17,37 @@ async function isAdmin() {
   } catch { return false; }
 }
 
+/**
+ * Normalize proxy input to URL format.
+ * Supports:
+ *   - http://user:pass@host:port  (already URL)
+ *   - HOST:PORT:USER:PASS         (common proxy format)
+ *   - USER:PASS@HOST:PORT         (alternative)
+ */
+function normalizeProxyUrl(input: string): string {
+  const trimmed = input.trim();
+
+  // Already a URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  // Format: HOST:PORT:USER:PASS
+  const parts = trimmed.split(':');
+  if (parts.length === 4) {
+    const [host, port, user, pass] = parts;
+    return `http://${user}:${pass}@${host}:${port}`;
+  }
+
+  // Format: USER:PASS@HOST:PORT
+  if (trimmed.includes('@')) {
+    return `http://${trimmed}`;
+  }
+
+  // Unknown format — store as-is
+  return trimmed;
+}
+
 /** GET — List all proxies */
 export async function GET() {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,11 +62,12 @@ export async function POST(req: Request) {
   if (!proxyUrl) return NextResponse.json({ error: 'Proxy URL is required' }, { status: 400 });
 
   const id = crypto.randomUUID();
-  await db.insert(proxyAccounts).values({ id, proxyUrl, label: label || null });
+  const normalized = normalizeProxyUrl(proxyUrl);
+  await db.insert(proxyAccounts).values({ id, proxyUrl: normalized, label: label || null });
   return NextResponse.json({ success: true, id });
 }
 
-/** PATCH — Bulk import proxies (one URL per line) */
+/** PATCH — Bulk import proxies (one per line) */
 export async function PATCH(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { proxies } = await req.json();
@@ -46,11 +78,14 @@ export async function PATCH(req: Request) {
   const lines = proxies.split('\n').map((l: string) => l.trim()).filter(Boolean);
   if (lines.length === 0) return NextResponse.json({ error: 'No proxies provided' }, { status: 400 });
 
+  // Normalize all inputs
+  const normalized = lines.map((l: string) => normalizeProxyUrl(l));
+
   // Get existing proxy URLs for deduplication
   const existing = await db.select({ proxyUrl: proxyAccounts.proxyUrl }).from(proxyAccounts);
   const existingSet = new Set(existing.map(e => e.proxyUrl));
 
-  const toInsert = lines
+  const toInsert = normalized
     .filter((url: string) => !existingSet.has(url))
     .map((url: string) => ({
       id: crypto.randomUUID(),

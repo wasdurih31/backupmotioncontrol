@@ -138,12 +138,12 @@ export default function AdminProxies() {
           <Plus className="w-4 h-4" /> Bulk Import Proxy
         </h2>
         <p className="text-xs text-muted-foreground mb-3">
-          Masukkan proxy URL satu per baris. Format: <code className="text-blue-400">http://username:password@host:port</code>
+          Masukkan proxy satu per baris. Format yang didukung: <code className="text-blue-400">HOST:PORT:USER:PASS</code> atau <code className="text-blue-400">http://user:pass@host:port</code>
         </p>
         <textarea
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
-          placeholder={"http://user1:pass1@geo.iproyal.com:12321\nhttp://user2:pass2@geo.iproyal.com:12321\nhttp://user3:pass3@geo.iproyal.com:12321"}
+          placeholder={"geo.iproyal.com:12321:username1:password1\ngeo.iproyal.com:12321:username2:password2\ngeo.iproyal.com:12321:username3:password3"}
           className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary min-h-[100px] resize-y"
           rows={4}
         />
