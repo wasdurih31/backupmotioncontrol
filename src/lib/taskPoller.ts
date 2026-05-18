@@ -208,7 +208,70 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
     return refreshed || task;
   }
 
+  // Jika di local development (atau localhost URL), polling fallback jalan terus karena webhook tidak bisa dipanggil.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+  if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
+    return await pollFreepikTaskLocally(task, apiKey);
+  }
+
   // Setelah startup poll selesai: hanya mengandalkan webhook
+  return task;
+}
+
+async function pollFreepikTaskLocally(task: DbTask, apiKey: string): Promise<DbTask> {
+  const pollingEndpoint = task.engine === 'wan_2_5'
+    ? `https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p/${task.id}`
+    : task.engine === 'pixverse'
+    ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${task.id}`
+    : task.engine === 'kling_2_1_pro'
+    ? `https://api.freepik.com/v1/ai/image-to-video/kling-v2-1/${task.id}`
+    : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${task.id}`;
+
+  try {
+    const res = await freepikFetch(pollingEndpoint, {
+      headers: {
+        'Accept': 'application/json',
+        'x-freepik-api-key': apiKey,
+        'x-magnific-api-key': apiKey,
+      },
+    });
+
+    if (!res.ok) return task;
+    const freepikData = await res.json();
+    const remoteTask = freepikData.data;
+
+    if (!remoteTask) return task;
+
+    const rs = remoteTask.status || remoteTask.state;
+    if (rs === 'COMPLETED' || rs === 'completed' || rs === 'success') {
+      let resultUrl = remoteTask.video?.url || remoteTask.video_url || remoteTask.result?.url || null;
+      if (!resultUrl) resultUrl = typeof remoteTask.result === 'string' ? remoteTask.result : null;
+
+      const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
+      await db.update(tasks).set({
+        status: 'success' as any,
+        resultUrl,
+        prompt: null,
+        expiresAt,
+        videoUrl: null,
+        imageUrl: null,
+      }).where(eq(tasks.id, task.id));
+      await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+      return { ...task, status: 'success', resultUrl, expiresAt, prompt: null, videoUrl: null, imageUrl: null };
+    } else if (rs === 'FAILED' || rs === 'failed' || rs === 'error') {
+      await db.update(tasks).set({
+        status: 'failed' as any,
+        videoUrl: null,
+        imageUrl: null,
+      }).where(eq(tasks.id, task.id));
+      await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+      return { ...task, status: 'failed', videoUrl: null, imageUrl: null };
+    }
+  } catch (e) {
+    console.warn(`[Local Poll] Error polling task ${task.id}:`, e);
+  }
   return task;
 }
 

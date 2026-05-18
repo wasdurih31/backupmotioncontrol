@@ -125,7 +125,8 @@ export async function POST(req: Request) {
 
     // Build webhook URL for Freepik callback
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
-    const freepikWebhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
+    const isLocalhost = appUrl.includes('localhost') || appUrl.includes('127.0.0.1');
+    const freepikWebhookUrl = (appUrl && !isLocalhost) ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
 
     if (engine === 'pixverse') {
       endpoint = 'https://api.freepik.com/v1/ai/image-to-video/pixverse-v5';
@@ -438,7 +439,8 @@ async function handlePaygGenerate(req: Request, userId: string) {
 
       // Build webhook URL
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
-      const webhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
+      const isLocalhost = appUrl.includes('localhost') || appUrl.includes('127.0.0.1');
+      const webhookUrl = (appUrl && !isLocalhost) ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
 
       if (paygModel === 'wan_2_5') {
         endpoint = 'https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p';
@@ -486,7 +488,8 @@ async function handlePaygGenerate(req: Request, userId: string) {
 
       // Build webhook URL so geminigen knows where to send completion callback
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
-      const webhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/geminigen` : '';
+      const isLocalhost = appUrl.includes('localhost') || appUrl.includes('127.0.0.1');
+      const webhookUrl = (appUrl && !isLocalhost) ? `${appUrl.replace(/\/$/, '')}/api/webhook/geminigen` : '';
 
       const formData = new FormData();
       formData.append('prompt', prompt || 'Generate video from reference image');

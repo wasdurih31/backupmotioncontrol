@@ -33,6 +33,7 @@ const adminLinks = [
   { name: "Video Keys", href: "/admin/video-keys", icon: Video },
   { name: "Proxies", href: "/admin/proxies", icon: Globe },
   { name: "Top Up User", href: "/admin/topup", icon: Wallet },
+  { name: "Validate API", href: "/admin/validate-key", icon: KeyRound },
   { name: "Settings", href: "/admin/settings", icon: Settings },
   { name: "Database Backup", href: "/admin/backup", icon: Database },
 ];
