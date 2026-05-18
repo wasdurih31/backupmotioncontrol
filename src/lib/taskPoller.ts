@@ -2,7 +2,6 @@ import { db } from '@/db';
 import { tasks, adminVideoKeys } from '@/db/schema';
 import { eq, and, lt, asc } from 'drizzle-orm';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
-import { freepikFetch } from '@/lib/proxyFetch';
 import { decrypt } from '@/lib/crypto';
 
 // Result video berlaku 30 menit setelah selesai.
@@ -51,94 +50,16 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
     return task;
   }
 
-  // Route to appropriate poller based on engine
+  // Route to appropriate handler based on engine
   if (task.engine === 'veo' || task.engine === 'grok') {
     // Geminigen.ai: coba polling sebagai fallback (webhook adalah primary).
-    // Jika polling gagal (404/error), tetap return task dari DB.
     return await pollGeminigenTask(task);
   }
 
-  const pollingEndpoint = task.engine === 'pixverse'
-    ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${task.id}`
-    : task.engine === 'kling_2_1_pro'
-    ? `https://api.freepik.com/v1/ai/image-to-video/kling-v2-1/${task.id}`
-    : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${task.id}`;
-
-  try {
-    const freepikRes = await freepikFetch(pollingEndpoint, {
-      headers: {
-        'Accept': 'application/json',
-        'x-freepik-api-key': apiKey,
-      },
-    });
-
-    if (!freepikRes.ok) {
-      // Error sementara — biarkan status tetap.
-      return task;
-    }
-
-    const freepikData = await freepikRes.json();
-    const remoteTask = freepikData.data;
-
-    let newStatus: string = task.status;
-    let resultUrl: string | null = task.resultUrl;
-
-    const rs = remoteTask?.status;
-    if (rs === 'COMPLETED' || rs === 'completed' || rs === 'success') {
-      newStatus = 'success';
-      resultUrl = (Array.isArray(remoteTask.generated) && remoteTask.generated.length > 0)
-        ? remoteTask.generated[0]
-        : remoteTask.video?.url || remoteTask.result?.video?.url || remoteTask.url || null;
-    } else if (rs === 'FAILED' || rs === 'failed' || rs === 'error') {
-      newStatus = 'failed';
-    } else {
-      newStatus = 'processing';
-    }
-
-    if (newStatus === task.status) {
-      return task;
-    }
-
-    // Status berubah — update DB.
-    if (newStatus === 'success') {
-      const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
-      await db.update(tasks).set({
-        status: 'success' as any,
-        resultUrl,
-        prompt: null,
-        expiresAt,
-        videoUrl: null,
-        imageUrl: null,
-      }).where(eq(tasks.id, task.id));
-      await cleanupBlobs([task.videoUrl, task.imageUrl]);
-
-      task.status = 'success' as any;
-      task.resultUrl = resultUrl;
-      task.prompt = null;
-      task.expiresAt = expiresAt;
-      task.videoUrl = null;
-      task.imageUrl = null;
-    } else if (newStatus === 'failed') {
-      await db.update(tasks).set({
-        status: 'failed' as any,
-        videoUrl: null,
-        imageUrl: null,
-      }).where(eq(tasks.id, task.id));
-      await cleanupBlobs([task.videoUrl, task.imageUrl]);
-
-      task.status = 'failed' as any;
-      task.videoUrl = null;
-      task.imageUrl = null;
-    } else {
-      await db.update(tasks).set({ status: newStatus as any }).where(eq(tasks.id, task.id));
-      task.status = newStatus as any;
-    }
-
-    return task;
-  } catch (e) {
-    console.warn(`[Poll ${task.id}] error:`, e);
-    return task;
-  }
+  // Freepik tasks: webhook handles status updates — no more API polling.
+  // Just return task from DB as-is. Webhook /api/webhook/freepik will update it.
+  console.log(`[Poll ${task.id}] Freepik task — waiting for webhook (no polling)`);
+  return task;
 }
 
 /**

@@ -123,6 +123,10 @@ export async function POST(req: Request) {
     let endpoint = '';
     let payload: Record<string, unknown> = {};
 
+    // Build webhook URL for Freepik callback
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
+    const freepikWebhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
+
     if (engine === 'pixverse') {
       endpoint = 'https://api.freepik.com/v1/ai/image-to-video/pixverse-v5';
       payload = {
@@ -132,6 +136,7 @@ export async function POST(req: Request) {
         duration: duration || 5,
         negative_prompt: negative_prompt || '',
         art_style: style || undefined,
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
       };
     } else if (engine === 'kling_2_1_pro') {
       endpoint = 'https://api.freepik.com/v1/ai/image-to-video/kling-v2-1-pro';
@@ -140,6 +145,7 @@ export async function POST(req: Request) {
         prompt: prompt,
         duration: duration ? duration.toString() : '5',
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
       };
       if (negative_prompt) {
         (payload as Record<string, unknown>).negative_prompt = negative_prompt;
@@ -156,7 +162,12 @@ export async function POST(req: Request) {
         prompt: prompt || '',
         character_orientation: character_orientation || 'video',
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
       };
+    }
+
+    if (freepikWebhookUrl) {
+      console.log(`[BYOK] Webhook URL registered: ${freepikWebhookUrl}`);
     }
 
     // ── Serialisasi call ke Freepik (untuk POST submit) ──
@@ -408,13 +419,22 @@ async function handlePaygGenerate(req: Request, userId: string) {
         ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
         : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
 
+      // Build webhook URL
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
+      const webhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
+
       const payload = {
         video_url: videoUrl,
         image_url: imageUrl,
         prompt: prompt || '',
         character_orientation: character_orientation || 'video',
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+        ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
       };
+
+      if (webhookUrl) {
+        console.log(`[PAYG] Webhook URL registered: ${webhookUrl}`);
+      }
 
       apiResponse = await runFreepikCall(() => freepikFetch(endpoint, {
         method: 'POST',
