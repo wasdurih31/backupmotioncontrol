@@ -116,87 +116,91 @@ export default function Home() {
 
           {/* Comparison Table */}
           <div className="bg-[#111113] border border-[#262626] rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 text-[11px] uppercase tracking-wider font-bold border-b border-[#262626] bg-[#0c0c0e]">
-              <div className="col-span-3 px-6 py-4 text-[#666] flex items-center gap-2">
-                🎬 Model AI Video
-              </div>
-              <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
-                ⏱️ Durasi
-              </div>
-              <div className="col-span-3 px-4 py-4 text-red-400/80 flex items-center gap-1">
-                ❌ Harga Website Lain
-              </div>
-              <div className="col-span-2 px-4 py-4 text-green-400/80 flex items-center gap-1">
-                ✅ Harga Kami
-              </div>
-              <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
-                🔥 Status
-              </div>
-            </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-[700px]">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 text-[11px] uppercase tracking-wider font-bold border-b border-[#262626] bg-[#0c0c0e]">
+                  <div className="col-span-3 px-6 py-4 text-[#666] flex items-center gap-2">
+                    🎬 Model AI Video
+                  </div>
+                  <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
+                    ⏱️ Durasi
+                  </div>
+                  <div className="col-span-3 px-4 py-4 text-red-400/80 flex items-center gap-1">
+                    ❌ Harga Website Lain
+                  </div>
+                  <div className="col-span-2 px-4 py-4 text-green-400/80 flex items-center gap-1">
+                    ✅ Harga Kami
+                  </div>
+                  <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
+                    🔥 Status
+                  </div>
+                </div>
 
-            {/* Table Rows */}
-            <div className="divide-y divide-[#1a1a1a]">
-              {/* Kling Motion Control */}
-              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
-                <div className="col-span-3 px-6 py-5">
-                  <span className="text-[#e5e5e5] font-semibold text-sm">Kling Motion Control</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-[#888] text-sm font-mono">15 Detik</span>
-                </div>
-                <div className="col-span-3 px-4 py-5">
-                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 18.000 / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.kling_std)} / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
-                    HEMAT {Math.round((1 - p.kling_std / 18000) * 100)}% 🤑
-                  </span>
-                </div>
-              </div>
+                {/* Table Rows */}
+                <div className="divide-y divide-[#1a1a1a]">
+                  {/* Kling Motion Control */}
+                  <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                    <div className="col-span-3 px-6 py-5">
+                      <span className="text-[#e5e5e5] font-semibold text-sm">Kling Motion Control</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-[#888] text-sm font-mono">3-30 Detik</span>
+                    </div>
+                    <div className="col-span-3 px-4 py-5">
+                      <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 3.500 - 35.000 / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.kling_std)} / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                        HEMAT {Math.round((1 - p.kling_std / 18000) * 100)}% 🤑
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Veo 3.1 Fast */}
-              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
-                <div className="col-span-3 px-6 py-5">
-                  <span className="text-[#e5e5e5] font-semibold text-sm">Veo 3.1 Fast</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-[#888] text-sm font-mono">8 Detik</span>
-                </div>
-                <div className="col-span-3 px-4 py-5">
-                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 15.000 / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.veo_720)} / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
-                    HEMAT {Math.round((1 - p.veo_720 / 15000) * 100)}% 🚀
-                  </span>
-                </div>
-              </div>
+                  {/* Veo 3.1 Fast */}
+                  <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                    <div className="col-span-3 px-6 py-5">
+                      <span className="text-[#e5e5e5] font-semibold text-sm">Veo 3.1 Fast</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-[#888] text-sm font-mono">8 Detik</span>
+                    </div>
+                    <div className="col-span-3 px-4 py-5">
+                      <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 15.000 / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.veo_720)} / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                        HEMAT {Math.round((1 - p.veo_720 / 15000) * 100)}% 🚀
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Grok AI Video */}
-              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
-                <div className="col-span-3 px-6 py-5">
-                  <span className="text-[#e5e5e5] font-semibold text-sm">Grok AI Video</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-[#888] text-sm font-mono">10 Detik</span>
-                </div>
-                <div className="col-span-3 px-4 py-5">
-                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 12.000 / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.grok_720)} / generate</span>
-                </div>
-                <div className="col-span-2 px-4 py-5">
-                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
-                    HEMAT {Math.round((1 - p.grok_720 / 12000) * 100)}% 🤑
-                  </span>
+                  {/* Grok AI Video */}
+                  <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                    <div className="col-span-3 px-6 py-5">
+                      <span className="text-[#e5e5e5] font-semibold text-sm">Grok AI Video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-[#888] text-sm font-mono">10 Detik</span>
+                    </div>
+                    <div className="col-span-3 px-4 py-5">
+                      <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 12.000 / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.grok_720)} / video</span>
+                    </div>
+                    <div className="col-span-2 px-4 py-5">
+                      <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                        HEMAT {Math.round((1 - p.grok_720 / 12000) * 100)}% 🤑
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
