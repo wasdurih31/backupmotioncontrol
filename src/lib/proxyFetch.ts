@@ -112,7 +112,7 @@ export async function freepikFetch(
   url: string | URL,
   init?: RequestInit,
 ): Promise<Response> {
-  const session = await getStickySession();
+  let session = await getStickySession();
   const urlStr = typeof url === 'string' ? url : url.toString();
   const method = init?.method || 'GET';
   const startTime = Date.now();
@@ -150,6 +150,46 @@ export async function freepikFetch(
       }
       console.log(`[Proxy] 📏 Body size: ${(bodyStr.length / 1024).toFixed(1)} KB`);
     } catch { /* not JSON */ }
+  }
+
+  // ── Pre-check IP for POST requests ──
+  // Ping api.magnific.com to ensure the IP isn't blocked by Cloudflare (403) before wasting API quota
+  if (session && method === 'POST') {
+    let pingAttempts = 0;
+    let isVerified = false;
+
+    while (session && pingAttempts < 3) {
+      pingAttempts++;
+      try {
+        console.log(`[Proxy] 🔍 Pre-checking IP with api.magnific.com (Attempt ${pingAttempts}/3)...`);
+        const pingRes = await fetch('https://api.magnific.com', {
+          method: 'GET',
+          // @ts-ignore
+          dispatcher: session.agent,
+        });
+
+        if (pingRes.status === 403 || pingRes.status === 407 || pingRes.status >= 500) {
+          console.warn(`[Proxy] ❌ Pre-check FAILED (HTTP ${pingRes.status}) — IP blocked. Rotating...`);
+          await markProxyError(`Precheck HTTP ${pingRes.status}`);
+          session = await getStickySession();
+          continue; // Try again with new session
+        }
+
+        console.log(`[Proxy] ✅ Pre-check PASSED (HTTP ${pingRes.status})`);
+        isVerified = true;
+        break; // Success, exit loop and keep current session
+      } catch (e: any) {
+        console.warn(`[Proxy] ❌ Pre-check network error: ${e.message} — Rotating...`);
+        await markProxyError(`Precheck network error`);
+        session = await getStickySession();
+        continue;
+      }
+    }
+
+    if (!isVerified) {
+      console.warn(`[Proxy] 🚨 All pre-check attempts failed or no proxies left. Falling back to DIRECT call.`);
+      session = null; // Clear session to trigger direct fallback
+    }
   }
 
   if (session) {
