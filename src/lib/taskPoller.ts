@@ -1,11 +1,18 @@
 import { db } from '@/db';
 import { tasks, adminVideoKeys } from '@/db/schema';
-import { eq, and, lt, asc } from 'drizzle-orm';
+import { eq, and, lt, asc, inArray } from 'drizzle-orm';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
+import { freepikFetch } from '@/lib/proxyFetch';
 import { decrypt } from '@/lib/crypto';
 
 // Result video berlaku 30 menit setelah selesai.
 export const RESULT_TTL_MS = 30 * 60 * 1000;
+
+// ─── Startup Poll Flag ──────────────────────────────────────────────
+// Pada cold start (setelah restart/deploy), polling Freepik dijalankan
+// SATU KALI untuk catch-up webhook yang mungkin terlewat saat server mati.
+// Setelah itu, semua update mengandalkan webhook saja.
+let _startupPollDone = false;
 
 /** Delete files dari R2 — gratis unlimited operations. */
 async function cleanupBlobs(urls: (string | null | undefined)[]) {
@@ -15,7 +22,6 @@ async function cleanupBlobs(urls: (string | null | undefined)[]) {
     if (key) {
       await deleteFromR2(key);
     }
-    // Juga handle legacy Vercel Blob URLs (skip, tidak bisa delete lagi)
   }
 }
 
@@ -41,8 +47,143 @@ export async function cleanupExpiredTasks() {
 type DbTask = typeof tasks.$inferSelect;
 
 /**
- * Poll status 1 task ke Freepik/Geminigen dan sinkronkan ke DB.
- * Mengembalikan task terbaru (sudah ter-update jika ada perubahan).
+ * One-time startup poll: cek semua Freepik tasks yang masih "processing" di DB.
+ * Dijalankan sekali saat cold start untuk catch-up webhook yang mungkin
+ * terlewat saat server down. Setelah ini, semua update lewat webhook.
+ */
+async function runStartupPoll(): Promise<void> {
+  if (_startupPollDone) return;
+  _startupPollDone = true;
+
+  try {
+    // Ambil semua task Freepik yang masih processing
+    const freepikEngines = ['kling', 'kling_pro', 'kling_2_1_pro', 'pixverse'];
+    const pendingTasks = await db.select()
+      .from(tasks)
+      .where(and(
+        eq(tasks.status, 'processing'),
+        // Engine bukan veo/grok (itu geminigen, bukan freepik)
+      ))
+      .limit(50);
+
+    // Filter hanya Freepik tasks (bukan veo/grok)
+    const freepikTasks = pendingTasks.filter(
+      t => t.engine !== 'veo' && t.engine !== 'grok'
+    );
+
+    if (freepikTasks.length === 0) {
+      console.log('[Startup Poll] ✅ No pending Freepik tasks — nothing to catch up');
+      return;
+    }
+
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`[Startup Poll] 🔄 Catching up ${freepikTasks.length} pending Freepik task(s)`);
+    console.log('═══════════════════════════════════════════════════════');
+
+    // Kumpulkan API keys yang dibutuhkan
+    // PAYG tasks: pakai pool key
+    // BYOK tasks: pakai user key
+    const { users } = await import('@/db/schema');
+
+    for (const task of freepikTasks) {
+      try {
+        let apiKey: string | null = null;
+
+        if (task.source === 'payg_freepik_pool') {
+          // PAYG: ambil pool key
+          const [poolKey] = await db.select()
+            .from(adminVideoKeys)
+            .where(and(
+              eq(adminVideoKeys.provider, 'freepik'),
+              eq(adminVideoKeys.status, 'active'),
+              eq(adminVideoKeys.isActive, true),
+            ))
+            .orderBy(asc(adminVideoKeys.lastUsedAt))
+            .limit(1);
+          if (poolKey) {
+            try { apiKey = decrypt(poolKey.apiKeyEncrypted); } catch { /* skip */ }
+          }
+        } else {
+          // BYOK: ambil user key
+          const [u] = await db.select({ apiKey: users.apiKey })
+            .from(users)
+            .where(eq(users.id, task.userId))
+            .limit(1);
+          if (u?.apiKey) apiKey = u.apiKey;
+        }
+
+        if (!apiKey) {
+          console.warn(`[Startup Poll] No API key for task ${task.id}, skipping`);
+          continue;
+        }
+
+        // Poll Freepik
+        const pollingEndpoint = task.engine === 'pixverse'
+          ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${task.id}`
+          : task.engine === 'kling_2_1_pro'
+          ? `https://api.freepik.com/v1/ai/image-to-video/kling-v2-1/${task.id}`
+          : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${task.id}`;
+
+        const res = await freepikFetch(pollingEndpoint, {
+          headers: {
+            'Accept': 'application/json',
+            'x-freepik-api-key': apiKey,
+          },
+        });
+
+        if (!res.ok) {
+          console.warn(`[Startup Poll] Task ${task.id}: HTTP ${res.status}, skipping`);
+          continue;
+        }
+
+        const freepikData = await res.json();
+        const remoteTask = freepikData.data;
+        const rs = remoteTask?.status;
+
+        if (rs === 'COMPLETED' || rs === 'completed' || rs === 'success') {
+          const resultUrl = (Array.isArray(remoteTask.generated) && remoteTask.generated.length > 0)
+            ? remoteTask.generated[0]
+            : remoteTask.video?.url || remoteTask.result?.video?.url || remoteTask.url || null;
+
+          const expiresAt = new Date(Date.now() + RESULT_TTL_MS);
+          await db.update(tasks).set({
+            status: 'success' as any,
+            resultUrl,
+            prompt: null,
+            expiresAt,
+            videoUrl: null,
+            imageUrl: null,
+          }).where(eq(tasks.id, task.id));
+          await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+          console.log(`[Startup Poll] ✅ Task ${task.id} → SUCCESS (caught up)`);
+        } else if (rs === 'FAILED' || rs === 'failed' || rs === 'error') {
+          await db.update(tasks).set({
+            status: 'failed' as any,
+            videoUrl: null,
+            imageUrl: null,
+          }).where(eq(tasks.id, task.id));
+          await cleanupBlobs([task.videoUrl, task.imageUrl]);
+
+          console.log(`[Startup Poll] ❌ Task ${task.id} → FAILED (caught up)`);
+        } else {
+          console.log(`[Startup Poll] ⏳ Task ${task.id} still ${rs}, will wait for webhook`);
+        }
+      } catch (e) {
+        console.warn(`[Startup Poll] Error polling task ${task.id}:`, e);
+      }
+    }
+
+    console.log('[Startup Poll] ✅ Catch-up complete — switching to webhook-only mode');
+  } catch (e) {
+    console.error('[Startup Poll] Error:', e);
+  }
+}
+
+/**
+ * Poll status 1 task dan sinkronkan ke DB.
+ * - Freepik: webhook primary, startup poll catch-up (1x saja)
+ * - Geminigen: webhook primary + polling fallback
  */
 export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<DbTask> {
   // Sudah final — tidak perlu hit provider.
@@ -52,13 +193,19 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
 
   // Route to appropriate handler based on engine
   if (task.engine === 'veo' || task.engine === 'grok') {
-    // Geminigen.ai: coba polling sebagai fallback (webhook adalah primary).
+    // Geminigen.ai: polling sebagai fallback (webhook primary).
     return await pollGeminigenTask(task);
   }
 
-  // Freepik tasks: webhook handles status updates — no more API polling.
-  // Just return task from DB as-is. Webhook /api/webhook/freepik will update it.
-  console.log(`[Poll ${task.id}] Freepik task — waiting for webhook (no polling)`);
+  // Freepik tasks: jalankan startup poll 1x, lalu cukup return dari DB.
+  if (!_startupPollDone) {
+    await runStartupPoll();
+    // Re-fetch task dari DB karena mungkin sudah diupdate oleh startup poll
+    const [refreshed] = await db.select().from(tasks).where(eq(tasks.id, task.id)).limit(1);
+    return refreshed || task;
+  }
+
+  // Setelah startup poll selesai: hanya mengandalkan webhook
   return task;
 }
 

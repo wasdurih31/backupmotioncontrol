@@ -2,73 +2,18 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { tasks, users, balanceTransactions } from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import crypto from 'crypto';
 
-const WEBHOOK_SECRET = process.env.FREEPIK_WEBHOOK_SECRET || '';
 const RESULT_TTL_MS = 30 * 60 * 1000; // 30 menit
 
 /**
- * Verify Freepik webhook signature (HMAC-SHA256).
- * Format header webhook-signature: "v1,<base64sig> v2,<base64sig>"
- */
-function verifySignature(body: string, headers: Headers): boolean {
-  if (!WEBHOOK_SECRET) {
-    console.warn('[Webhook Freepik] ⚠️ FREEPIK_WEBHOOK_SECRET not set — skipping verification');
-    return true; // Skip verification if no secret
-  }
-
-  const webhookId = headers.get('webhook-id') || '';
-  const webhookTimestamp = headers.get('webhook-timestamp') || '';
-  const webhookSignature = headers.get('webhook-signature') || '';
-
-  if (!webhookId || !webhookTimestamp || !webhookSignature) {
-    console.warn('[Webhook Freepik] Missing security headers');
-    return false;
-  }
-
-  // Check timestamp freshness (5 min window)
-  const ts = parseInt(webhookTimestamp, 10);
-  if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) {
-    console.warn('[Webhook Freepik] Timestamp too old or invalid');
-    return false;
-  }
-
-  // Generate expected signature
-  const contentToSign = `${webhookId}.${webhookTimestamp}.${body}`;
-  const secretBytes = Buffer.from(WEBHOOK_SECRET, 'utf-8');
-  const hmac = crypto.createHmac('sha256', secretBytes);
-  hmac.update(contentToSign);
-  const expectedSig = hmac.digest('base64');
-
-  // Check against all signatures in header
-  const signatures = webhookSignature.split(' ');
-  for (const sig of signatures) {
-    const [, sigValue] = sig.split(',');
-    if (sigValue === expectedSig) {
-      return true;
-    }
-  }
-
-  console.warn('[Webhook Freepik] Signature mismatch');
-  return false;
-}
-
-/**
  * POST /api/webhook/freepik
- * Webhook endpoint yang dipanggil oleh Freepik saat video generation selesai/gagal.
- * Payload mirip dengan response GET status task.
+ * Universal webhook — dipanggil oleh Freepik saat video generation selesai/gagal.
+ * Tidak perlu signature verification karena setiap user BYOK punya akun sendiri.
+ * Payload mirip response GET status task.
  */
 export async function POST(req: Request) {
   try {
-    const rawBody = await req.text();
-
-    // Verify signature
-    if (!verifySignature(rawBody, req.headers)) {
-      console.error('[Webhook Freepik] ❌ Signature verification failed');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = JSON.parse(rawBody);
+    const body = await req.json();
     console.log('═══════════════════════════════════════════════════════');
     console.log('[Webhook Freepik] 📩 Received webhook');
     console.log('[Webhook Freepik] Payload:', JSON.stringify(body).slice(0, 800));
