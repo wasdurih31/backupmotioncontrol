@@ -96,8 +96,11 @@ export default function ValidateKeyPage() {
                     <p className="text-sm text-muted-foreground">Validasi berhasil. Berhasil membuat request ke model kling-v2-5-pro.</p>
                     <p className="text-sm font-mono text-green-400 mt-2">
                       <span className="text-muted-foreground mr-2">Task ID:</span> 
-                      {result.data?.id || result.data?.data?.id || result.data?.task_id || "Task ID not found in response"}
+                      {result.data?.task_id?.toString() || result.data?.uuid?.toString() || result.data?.id?.toString() || result.data?.data?.task_id?.toString() || result.data?.data?.uuid?.toString() || result.data?.data?.id?.toString() || "Task ID not found"}
                     </p>
+                    <div className="mt-3 p-3 bg-black/50 rounded-md overflow-x-auto text-[10px] font-mono text-muted-foreground/70">
+                      {JSON.stringify(result.data, null, 2)}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-1">
