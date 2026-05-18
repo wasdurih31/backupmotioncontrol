@@ -29,19 +29,20 @@ interface StickySession {
   startedAt: number; // Date.now()
 }
 
-let _session: StickySession | null = null;
+let _sessions = new Map<string, StickySession>();
 
 /**
- * Get or create a sticky proxy session.
+ * Get or create a sticky proxy session for a specific API Key.
  * Uses the least-recently-used active proxy from the database.
- * Sticks to the same proxy for ~30 minutes.
+ * Sticks to the same proxy for ~30 minutes per API key.
  */
-async function getStickySession(): Promise<StickySession | null> {
+async function getStickySession(apiKey: string): Promise<StickySession | null> {
   const now = Date.now();
+  let session = _sessions.get(apiKey);
 
   // If current session is still valid, reuse it
-  if (_session && (now - _session.startedAt) < STICKY_DURATION_MS) {
-    return _session;
+  if (session && (now - session.startedAt) < STICKY_DURATION_MS) {
+    return session;
   }
 
   // Session expired or doesn't exist — pick a new proxy from DB
@@ -59,12 +60,14 @@ async function getStickySession(): Promise<StickySession | null> {
 
     // Create new ProxyAgent
     const agent = new ProxyAgent(proxy.proxyUrl);
-    _session = {
+    session = {
       proxyId: proxy.id,
       proxyUrl: proxy.proxyUrl,
       agent,
       startedAt: now,
     };
+    
+    _sessions.set(apiKey, session);
 
     // Mark as used
     await db.update(proxyAccounts).set({
@@ -79,8 +82,8 @@ async function getStickySession(): Promise<StickySession | null> {
       masked = `${u.protocol}//${u.username.slice(0, 4)}***@${u.hostname}:${u.port}`;
     } catch { /* ignore */ }
 
-    console.log(`[Proxy] New sticky session: ${masked} (label: ${proxy.label || 'none'})`);
-    return _session;
+    console.log(`[Proxy] New sticky session for key ...${apiKey.slice(-6)}: ${masked} (label: ${proxy.label || 'none'})`);
+    return session;
   } catch (e) {
     console.error('[Proxy] Failed to get proxy from DB:', e);
     return null;
@@ -90,15 +93,16 @@ async function getStickySession(): Promise<StickySession | null> {
 /**
  * Mark the current proxy session as errored and force rotation on next call.
  */
-async function markProxyError(errorMsg: string) {
-  if (!_session) return;
+async function markProxyError(apiKey: string, errorMsg: string) {
+  const session = _sessions.get(apiKey);
+  if (!session) return;
   try {
     await db.update(proxyAccounts).set({
       lastError: errorMsg.slice(0, 500),
-    }).where(eq(proxyAccounts.id, _session.proxyId));
+    }).where(eq(proxyAccounts.id, session.proxyId));
   } catch { /* ignore */ }
   // Force rotation on next call
-  _session = null;
+  _sessions.delete(apiKey);
 }
 
 /**
@@ -112,7 +116,11 @@ export async function freepikFetch(
   url: string | URL,
   init?: RequestInit,
 ): Promise<Response> {
-  let session = await getStickySession();
+  // Extract API key to bind the proxy session
+  const headers = init?.headers as Record<string, string>;
+  const apiKey = headers?.['x-freepik-api-key'] || 'default_key';
+
+  let session = await getStickySession(apiKey);
   const urlStr = typeof url === 'string' ? url : url.toString();
   const method = init?.method || 'GET';
   const startTime = Date.now();
@@ -171,8 +179,8 @@ export async function freepikFetch(
 
         if (pingRes.status === 403 || pingRes.status === 407 || pingRes.status >= 500) {
           console.warn(`[Proxy] ❌ Pre-check FAILED (HTTP ${pingRes.status}) — IP blocked. Rotating...`);
-          await markProxyError(`Precheck HTTP ${pingRes.status}`);
-          session = await getStickySession();
+          await markProxyError(apiKey, `Precheck HTTP ${pingRes.status}`);
+          session = await getStickySession(apiKey);
           continue; // Try again with new session
         }
 
@@ -181,8 +189,8 @@ export async function freepikFetch(
         break; // Success, exit loop and keep current session
       } catch (e: any) {
         console.warn(`[Proxy] ❌ Pre-check network error: ${e.message} — Rotating...`);
-        await markProxyError(`Precheck network error`);
-        session = await getStickySession();
+        await markProxyError(apiKey, `Precheck network error`);
+        session = await getStickySession(apiKey);
         continue;
       }
     }
@@ -223,14 +231,14 @@ export async function freepikFetch(
       // If we get a proxy-related error (407, 502, 503), mark and rotate
       if (response.status === 407 || response.status === 502 || response.status === 503) {
         console.warn(`[Proxy] ⚠️ Proxy error ${response.status} — will rotate on next call`);
-        await markProxyError(`HTTP ${response.status} from proxy`);
+        await markProxyError(apiKey, `HTTP ${response.status} from proxy`);
       }
 
       return response;
     } catch (e: any) {
       const elapsed = Date.now() - startTime;
       // Network error through proxy — mark and throw
-      await markProxyError(e.message || 'Network error');
+      await markProxyError(apiKey, e.message || 'Network error');
       console.error(`[Proxy] ❌ Proxy network error (${elapsed}ms): ${e.message}`);
       throw new Error('Terjadi gangguan jaringan internal. Silakan coba lagi nanti.');
     }
