@@ -24,7 +24,7 @@ interface GenerateFormValues {
   character_orientation?: "video" | "image";
   cfg_scale?: number;
   model?: string;
-  engine: "kling" | "pixverse" | "kling_2_1_pro";
+  engine: "kling" | "pixverse" | "kling_2_1_pro" | "wan_2_5";
   resolution?: string;
   duration?: number;
   negative_prompt?: string;

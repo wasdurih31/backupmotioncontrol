@@ -150,6 +150,17 @@ export async function POST(req: Request) {
       if (negative_prompt) {
         (payload as Record<string, unknown>).negative_prompt = negative_prompt;
       }
+    } else if (engine === 'wan_2_5') {
+      endpoint = 'https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p';
+      payload = {
+        image: imageUrl,
+        prompt: prompt,
+        duration: duration ? duration.toString() : '5',
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
+      };
+      if (negative_prompt) {
+        (payload as Record<string, unknown>).negative_prompt = negative_prompt;
+      }
     } else {
       // Kling (default)
       endpoint = model === 'pro'
@@ -177,6 +188,7 @@ export async function POST(req: Request) {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'x-freepik-api-key': user.apiKey as string,
+        'x-magnific-api-key': user.apiKey as string,
       },
       body: JSON.stringify(payload),
     }));
@@ -265,7 +277,7 @@ async function cleanupBlobs(urls: (string | null | undefined)[]) {
 }
 
 // ─── PAYG Model Definitions ──────────────────────────────────────────
-type PaygModel = 'kling_std' | 'kling_pro' | 'veo_720' | 'veo_1080' | 'grok_720';
+type PaygModel = 'kling_std' | 'kling_pro' | 'veo_720' | 'veo_1080' | 'grok_720' | 'wan_2_5';
 
 const PAYG_MODEL_CONFIG: Record<PaygModel, {
   provider: 'freepik' | 'geminigen';
@@ -308,6 +320,13 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
     source: 'payg_geminigen_pool',
     engine: 'grok',
     model: 'grok-3',
+  },
+  wan_2_5: {
+    provider: 'freepik',
+    settingsKey: 'price_wan_2_5',
+    source: 'payg_freepik_pool',
+    engine: 'wan_2_5',
+    model: 'wan-2-5-i2v-1080p',
   },
 };
 
@@ -414,23 +433,36 @@ async function handlePaygGenerate(req: Request, userId: string) {
 
   try {
     if (config.provider === 'freepik') {
-      // Kling Motion Control via Freepik
-      const endpoint = paygModel === 'kling_pro'
-        ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
-        : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
+      let endpoint = '';
+      let payload: Record<string, unknown> = {};
 
       // Build webhook URL
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || '';
       const webhookUrl = appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhook/freepik` : '';
 
-      const payload = {
-        video_url: videoUrl,
-        image_url: imageUrl,
-        prompt: prompt || '',
-        character_orientation: character_orientation || 'video',
-        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
-        ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
-      };
+      if (paygModel === 'wan_2_5') {
+        endpoint = 'https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p';
+        payload = {
+          image: imageUrl,
+          prompt: prompt || 'Generate video',
+          duration: duration ? duration.toString() : '5',
+          ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+        };
+      } else {
+        // Kling Motion Control via Freepik
+        endpoint = paygModel === 'kling_pro'
+          ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
+          : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';
+
+        payload = {
+          video_url: videoUrl,
+          image_url: imageUrl,
+          prompt: prompt || '',
+          character_orientation: character_orientation || 'video',
+          cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+          ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+        };
+      }
 
       if (webhookUrl) {
         console.log(`[PAYG] Webhook URL registered: ${webhookUrl}`);
@@ -442,6 +474,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'x-freepik-api-key': decryptedKey,
+          'x-magnific-api-key': decryptedKey,
         },
         body: JSON.stringify(payload),
       }));
