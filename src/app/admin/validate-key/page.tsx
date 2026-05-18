@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+
 export default function ValidateKeyPage() {
   const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("kling_2_5_pro");
   const [count, setCount] = useState(1);
   const [delay, setDelay] = useState(3);
   
@@ -37,7 +40,7 @@ export default function ValidateKeyPage() {
         const res = await fetch("/api/admin/validate-key", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey: apiKey.trim() }),
+          body: JSON.stringify({ apiKey: apiKey.trim(), model }),
         });
 
         const data = await res.json();
@@ -94,6 +97,19 @@ export default function ValidateKeyPage() {
                 onChange={(e) => setApiKey(e.target.value)}
                 className="font-mono text-sm bg-black/20"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Model Validasi</label>
+              <Select value={model} onValueChange={(val) => setModel(val || "kling_2_5_pro")}>
+                <SelectTrigger className="bg-black/20 text-sm">
+                  <SelectValue placeholder="Pilih Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kling_2_5_pro">Kling 2.5 Pro (Image-to-Video)</SelectItem>
+                  <SelectItem value="wan_2_5_t2v">WAN 2.5 480p (Text-to-Video)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -166,7 +182,7 @@ export default function ValidateKeyPage() {
                 <div className="bg-black/40 p-4 rounded-md">
                   {result.status === 200 ? (
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Validasi berhasil. Berhasil membuat request ke model kling-v2-5-pro.</p>
+                      <p className="text-sm text-muted-foreground">Validasi berhasil. Berhasil membuat request ke model {model === 'wan_2_5_t2v' ? 'wan-2-5-t2v-480p' : 'kling-v2-5-pro'}.</p>
                       <p className="text-sm font-mono text-green-400 mt-2">
                         <span className="text-muted-foreground mr-2">Task ID:</span> 
                         {result.data?.task_id?.toString() || result.data?.uuid?.toString() || result.data?.id?.toString() || result.data?.data?.task_id?.toString() || result.data?.data?.uuid?.toString() || result.data?.data?.id?.toString() || "Task ID not found"}
