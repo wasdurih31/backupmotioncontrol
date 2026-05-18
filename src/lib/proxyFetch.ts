@@ -157,11 +157,12 @@ export async function freepikFetch(
   if (session && method === 'POST') {
     let pingAttempts = 0;
     let isVerified = false;
+    const maxPingAttempts = 10;
 
-    while (session && pingAttempts < 3) {
+    while (session && pingAttempts < maxPingAttempts) {
       pingAttempts++;
       try {
-        console.log(`[Proxy] 🔍 Pre-checking IP with api.magnific.com (Attempt ${pingAttempts}/3)...`);
+        console.log(`[Proxy] 🔍 Pre-checking IP with api.magnific.com (Attempt ${pingAttempts}/${maxPingAttempts})...`);
         const pingRes = await fetch('https://api.magnific.com', {
           method: 'GET',
           // @ts-ignore
@@ -187,8 +188,8 @@ export async function freepikFetch(
     }
 
     if (!isVerified) {
-      console.warn(`[Proxy] 🚨 All pre-check attempts failed or no proxies left. Falling back to DIRECT call.`);
-      session = null; // Clear session to trigger direct fallback
+      console.error(`[Proxy] 🚨 Semua ${maxPingAttempts} IP proxy sibuk atau diblokir (403). Mencegah pengiriman tanpa proxy!`);
+      throw new Error('Semua ip proxy sibuk atau terblokir. Silakan coba lagi nanti.');
     }
   }
 
