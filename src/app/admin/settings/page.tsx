@@ -16,6 +16,7 @@ const SETTINGS_FIELDS = [
   { key: "price_veo_720", label: "Harga Veo 3.1 Fast 720p (Rp)", placeholder: "600", description: "Harga per generate Veo 3.1 Fast 720p." },
   { key: "price_veo_1080", label: "Harga Veo 3.1 Fast 1080p (Rp)", placeholder: "1000", description: "Harga per generate Veo 3.1 Fast 1080p." },
   { key: "price_grok_720", label: "Harga Grok AI 720p (Rp)", placeholder: "800", description: "Harga per generate Grok AI 720p." },
+  { key: "price_wan_2_5", label: "Harga WAN 2.5 1080p (Rp)", placeholder: "1500", description: "Harga per generate WAN 2.5 1080p." },
 ];
 
 export default function AdminSettingsPage() {

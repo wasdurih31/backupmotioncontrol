@@ -840,7 +840,7 @@ export default function GenerateVideoPage() {
                 )} />
 
                 {/* Configuration Card — show for BYOK always, or PAYG with config options */}
-                {(!isPayg || selectedPaygModel.startsWith('kling') || selectedPaygModel.startsWith('veo') || selectedPaygModel === 'grok_720') && (
+                {(!isPayg || selectedPaygModel.startsWith('kling') || selectedPaygModel.startsWith('veo') || selectedPaygModel === 'grok_720' || selectedPaygModel === 'wan_2_5') && (
                 <Card className="bg-card/20 border-border/40 overflow-hidden backdrop-blur-xl shadow-2xl">
                   <CardHeader className="px-5 py-4 border-b border-border/40 bg-white/5 flex flex-row items-center justify-between">
                     <CardTitle className="text-[11px] uppercase tracking-[0.2em] font-black flex items-center gap-2.5 text-white/90">
@@ -1200,7 +1200,7 @@ export default function GenerateVideoPage() {
                           </FormItem>
                         )} />
                       </>
-                    ) : form.watch("engine") === "wan_2_5" ? (
+                    ) : (!isPayg && form.watch("engine") === "wan_2_5") || (isPayg && selectedPaygModel === "wan_2_5") ? (
                       <>
                         <div className="grid grid-cols-2 divide-x divide-border/30">
                           <FormField control={form.control} name="resolution" render={({ field }) => (

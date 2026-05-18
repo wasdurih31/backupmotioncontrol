@@ -9,6 +9,7 @@ const PRICING_KEYS = [
   'price_veo_720',
   'price_veo_1080',
   'price_grok_720',
+  'price_wan_2_5',
 ];
 
 const STRING_KEYS = [
