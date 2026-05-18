@@ -38,15 +38,16 @@ export default function Home() {
         const res = await fetch("/api/pricing");
         if (res.ok) {
           const json = await res.json();
-          const pr = json.pricing || json;
+          const pr = json.pricing || {};
+          const st = json.settings || {};
           setPricing({
-            kling_std: pr.price_kling_std || pr.kling_std || 650,
-            kling_pro: pr.price_kling_pro || pr.kling_pro || 1000,
-            veo_720: pr.price_veo_720 || pr.veo_720 || 600,
-            veo_1080: pr.price_veo_1080 || pr.veo_1080 || 1000,
-            grok_720: pr.price_grok_720 || pr.grok_720 || 800,
-            whatsapp_link: pr.whatsapp_admin_link || pr.whatsapp_link || '',
-            byok_link: pr.byok_signup_link || pr.byok_link || '',
+            kling_std: pr.price_kling_std || 650,
+            kling_pro: pr.price_kling_pro || 1000,
+            veo_720: pr.price_veo_720 || 600,
+            veo_1080: pr.price_veo_1080 || 1000,
+            grok_720: pr.price_grok_720 || 800,
+            whatsapp_link: st.whatsapp_admin_link || '',
+            byok_link: st.byok_signup_link || '',
           });
         }
       } catch { /* use defaults */ }
@@ -92,55 +93,133 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Price Comparison */}
-      <section className="py-20 px-6 border-t border-[#1a1a1a]">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#666] mb-4">Perbandingan Harga</p>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Mereka charge per detik.<br />
-              <span className="text-[#666]">Kami charge flat per video.</span>
+      {/* Price Comparison - Hard Selling */}
+      <section className="py-20 px-6 border-t border-[#1a1a1a] relative overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-green-500/[0.03] rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/[0.02] rounded-full blur-[80px] pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto relative">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-full px-4 py-1.5 mb-6">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-[11px] uppercase tracking-[0.15em] text-green-400 font-bold">Hemat Hingga 96%</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+              Kenapa bayar mahal<br />
+              <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 bg-clip-text text-transparent">kalau bisa hemat?</span>
             </h2>
+            <p className="text-[#888] max-w-2xl mx-auto text-lg">
+              Bandingkan sendiri harga generate video AI di website lain vs di UniverseAI Studio.
+            </p>
           </div>
 
           {/* Comparison Table */}
-          <div className="bg-[#141414] border border-[#262626] rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-4 text-[11px] uppercase tracking-wider text-[#666] font-semibold border-b border-[#262626] px-6 py-4">
-              <span>Platform</span>
-              <span>Model</span>
-              <span>Harga / Video 15s</span>
-              <span>Sistem</span>
+          <div className="bg-[#111113] border border-[#262626] rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 text-[11px] uppercase tracking-wider font-bold border-b border-[#262626] bg-[#0c0c0e]">
+              <div className="col-span-3 px-6 py-4 text-[#666] flex items-center gap-2">
+                🎬 Model AI Video
+              </div>
+              <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
+                ⏱️ Durasi
+              </div>
+              <div className="col-span-3 px-4 py-4 text-red-400/80 flex items-center gap-1">
+                ❌ Harga Website Lain
+              </div>
+              <div className="col-span-2 px-4 py-4 text-green-400/80 flex items-center gap-1">
+                ✅ Harga Kami
+              </div>
+              <div className="col-span-2 px-4 py-4 text-[#666] flex items-center gap-1">
+                🔥 Status
+              </div>
             </div>
+
+            {/* Table Rows */}
             <div className="divide-y divide-[#1a1a1a]">
-              <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
-                <span className="text-[#888]">Kling AI</span>
-                <span className="text-[#888]">Motion Control Std</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 16.800</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.07/detik</span>
+              {/* Kling Motion Control */}
+              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                <div className="col-span-3 px-6 py-5">
+                  <span className="text-[#e5e5e5] font-semibold text-sm">Kling Motion Control</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-[#888] text-sm font-mono">15 Detik</span>
+                </div>
+                <div className="col-span-3 px-4 py-5">
+                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 18.000 / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.kling_std)} / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                    HEMAT {Math.round((1 - p.kling_std / 18000) * 100)}% 🤑
+                  </span>
+                </div>
               </div>
-              <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
-                <span className="text-[#888]">Kling AI</span>
-                <span className="text-[#888]">Motion Control Pro</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 33.600</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.14/detik</span>
+
+              {/* Veo 3.1 Fast */}
+              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                <div className="col-span-3 px-6 py-5">
+                  <span className="text-[#e5e5e5] font-semibold text-sm">Veo 3.1 Fast</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-[#888] text-sm font-mono">10 Detik</span>
+                </div>
+                <div className="col-span-3 px-4 py-5">
+                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 15.000 / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.veo_720)} / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                    HEMAT {Math.round((1 - p.veo_720 / 15000) * 100)}% 🚀
+                  </span>
+                </div>
               </div>
-              <div className="grid grid-cols-4 px-6 py-4 text-sm items-center">
-                <span className="text-[#888]">Veo 3.1</span>
-                <span className="text-[#888]">Fast 720p (8s)</span>
-                <span className="text-[#e5e5e5] font-mono">~Rp 12.800</span>
-                <span className="text-[10px] text-[#666] bg-[#1a1a1a] px-2 py-1 rounded w-fit">$0.10/detik</span>
+
+              {/* Grok AI Video */}
+              <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
+                <div className="col-span-3 px-6 py-5">
+                  <span className="text-[#e5e5e5] font-semibold text-sm">Grok AI Video</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-[#888] text-sm font-mono">10 Detik</span>
+                </div>
+                <div className="col-span-3 px-4 py-5">
+                  <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 12.000 / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.grok_720)} / generate</span>
+                </div>
+                <div className="col-span-2 px-4 py-5">
+                  <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                    HEMAT {Math.round((1 - p.grok_720 / 12000) * 100)}% 🤑
+                  </span>
+                </div>
               </div>
-              <div className="grid grid-cols-4 px-6 py-5 text-sm items-center bg-white/[0.02]">
-                <span className="text-white font-semibold">UniverseAI</span>
-                <span className="text-white">Semua Model</span>
-                <span className="text-white font-bold font-mono">{fmtRp(minPrice)}–{fmtRp(maxPrice)}</span>
-                <span className="text-[10px] text-white bg-white/10 px-2 py-1 rounded w-fit font-medium">flat / video</span>
+            </div>
+
+            {/* Bottom CTA Banner */}
+            <div className="bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-teal-500/10 border-t border-green-500/20 px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center text-lg">💰</div>
+                <div>
+                  <p className="text-white font-bold text-sm">Hemat sampai jutaan rupiah per bulan!</p>
+                  <p className="text-green-400/60 text-xs">Mulai dari {fmtRp(minPrice)} per generate. Tanpa biaya per detik.</p>
+                </div>
               </div>
+              <Link href="/login" className="shrink-0">
+                <button className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/40 hover:scale-105 active:scale-95">
+                  Mulai Generate Sekarang →
+                </button>
+              </Link>
             </div>
           </div>
 
           <p className="text-center text-[11px] text-[#555] mt-4">
-            * Harga kompetitor berdasarkan pricing resmi API per Mei 2026. Konversi $1 = Rp 16.000.
+            * Harga kompetitor berdasarkan pricing resmi API per Mei 2026. Harga UniverseAI Studio sudah flat per video.
           </p>
         </div>
       </section>
