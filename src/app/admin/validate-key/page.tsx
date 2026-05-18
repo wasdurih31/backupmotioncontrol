@@ -87,13 +87,27 @@ export default function ValidateKeyPage() {
                   <XCircle className="w-5 h-5 text-red-500" />
                 )}
                 <h3 className={`font-semibold ${result.status === 200 ? 'text-green-500' : 'text-red-500'}`}>
-                  {result.status === 200 ? "Success (200 OK)" : `Error (${result.status})`}
+                  {result.status === 200 ? "API Key Valid (200 OK)" : `Invalid / Error (${result.status})`}
                 </h3>
               </div>
-              <div className="bg-black/40 p-4 rounded-md overflow-x-auto">
-                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
+              <div className="bg-black/40 p-4 rounded-md">
+                {result.status === 200 ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Validasi berhasil. Berhasil membuat request ke model kling-v2-5-pro.</p>
+                    <p className="text-sm font-mono text-green-400 mt-2">
+                      <span className="text-muted-foreground mr-2">Task ID:</span> 
+                      {result.data?.id || result.data?.data?.id || result.data?.task_id || "Task ID not found in response"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Validasi gagal atau limit tercapai.</p>
+                    <p className="text-sm font-mono text-red-400 mt-2">
+                      <span className="text-muted-foreground mr-2">Status:</span> 
+                      {result.error || result.details?.message || result.details?.error || "Terjadi kesalahan yang tidak diketahui"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

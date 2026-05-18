@@ -118,7 +118,7 @@ export async function freepikFetch(
 ): Promise<Response> {
   // Extract API key to bind the proxy session
   const headers = init?.headers as Record<string, string>;
-  const apiKey = headers?.['x-freepik-api-key'] || 'default_key';
+  const apiKey = headers?.['x-freepik-api-key'] || headers?.['x-magnific-api-key'] || 'default_key';
 
   let session = await getStickySession(apiKey);
   const urlStr = typeof url === 'string' ? url : url.toString();
