@@ -139,23 +139,24 @@ export default function Home() {
 
                 {/* Table Rows */}
                 <div className="divide-y divide-[#1a1a1a]">
-                  {/* Kling Motion Control */}
+                  {/* Kling Motion Control Std */}
                   <div className="grid grid-cols-12 px-0 items-center group hover:bg-white/[0.02] transition-colors">
                     <div className="col-span-3 px-6 py-5">
-                      <span className="text-[#e5e5e5] font-semibold text-sm">Kling Motion Control</span>
+                      <span className="text-[#e5e5e5] font-semibold text-sm">Kling Motion Control Std</span>
                     </div>
                     <div className="col-span-2 px-4 py-5">
                       <span className="text-[#888] text-sm font-mono">3-30 Detik</span>
                     </div>
                     <div className="col-span-3 px-4 py-5">
-                      <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 3.500 - 35.000 / video</span>
+                      <span className="text-red-400/70 text-sm font-mono line-through decoration-red-500/50">Rp 2.000 - 25.000</span>
+                      <span className="text-[10px] text-[#666] ml-1 block mt-0.5">(dihitung per detik)</span>
                     </div>
                     <div className="col-span-2 px-4 py-5">
                       <span className="text-green-400 text-sm font-bold font-mono">{fmtRp(p.kling_std)} / video</span>
                     </div>
                     <div className="col-span-2 px-4 py-5">
                       <span className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full">
-                        HEMAT {Math.round((1 - p.kling_std / 18000) * 100)}% 🤑
+                        HEMAT {Math.round((1 - p.kling_std / 25000) * 100)}% 🤑
                       </span>
                     </div>
                   </div>
