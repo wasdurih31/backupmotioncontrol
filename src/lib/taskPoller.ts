@@ -2,6 +2,7 @@ import { db } from '@/db';
 import { tasks, adminVideoKeys } from '@/db/schema';
 import { eq, and, lt, asc } from 'drizzle-orm';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
+import { freepikFetch } from '@/lib/proxyFetch';
 import { decrypt } from '@/lib/crypto';
 
 // Result video berlaku 30 menit setelah selesai.
@@ -64,7 +65,7 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
     : `https://api.freepik.com/v1/ai/image-to-video/kling-v2-6/${task.id}`;
 
   try {
-    const freepikRes = await fetch(pollingEndpoint, {
+    const freepikRes = await freepikFetch(pollingEndpoint, {
       headers: {
         'Accept': 'application/json',
         'x-freepik-api-key': apiKey,

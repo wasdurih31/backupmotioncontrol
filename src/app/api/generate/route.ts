@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { users, tasks, adminVideoKeys, balanceTransactions, appSettings } from '@/db/schema';
 import { and, eq, inArray, sql, gt, asc } from 'drizzle-orm';
 import { runFreepikCall } from '@/lib/freepikQueue';
+import { freepikFetch } from '@/lib/proxyFetch';
 import { deleteFromR2, getR2KeyFromUrl } from '@/lib/r2';
 import { decrypt } from '@/lib/crypto';
 
@@ -159,7 +160,7 @@ export async function POST(req: Request) {
     }
 
     // ── Serialisasi call ke Freepik (untuk POST submit) ──
-    const freepikRes = await runFreepikCall(() => fetch(endpoint, {
+    const freepikRes = await runFreepikCall(() => freepikFetch(endpoint, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -415,7 +416,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
         cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
       };
 
-      apiResponse = await runFreepikCall(() => fetch(endpoint, {
+      apiResponse = await runFreepikCall(() => freepikFetch(endpoint, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
