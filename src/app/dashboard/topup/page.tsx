@@ -3,25 +3,56 @@
 import { useEffect, useState } from "react";
 import { Loader2, Wallet, MessageCircle } from "lucide-react";
 
-const TOPUP_OPTIONS = [
+const DEFAULT_TOPUP_OPTIONS = [
   { amount: 10000, label: "Rp 10.000" },
   { amount: 25000, label: "Rp 25.000" },
   { amount: 50000, label: "Rp 50.000" },
 ];
 
-const WHATSAPP_NUMBER = "628000000000";
-
 export default function TopUpPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [topupOptions, setTopupOptions] = useState(DEFAULT_TOPUP_OPTIONS);
 
   useEffect(() => {
-    async function fetchUser() {
+    async function fetchData() {
       try {
-        const res = await fetch("/api/user/profile");
-        if (res.ok) {
-          const data = await res.json();
+        // Fetch user profile and settings in parallel
+        const [userRes, pricingRes] = await Promise.all([
+          fetch("/api/user/profile"),
+          fetch("/api/pricing"),
+        ]);
+
+        if (userRes.ok) {
+          const data = await userRes.json();
           setUser(data);
+        }
+
+        if (pricingRes.ok) {
+          const { settings } = await pricingRes.json();
+
+          // WhatsApp number from admin settings
+          if (settings?.whatsapp_admin_link) {
+            // Support both formats: full link (https://wa.me/628xxx) or just number (628xxx)
+            const waValue = settings.whatsapp_admin_link;
+            const match = waValue.match(/(\d{10,15})/);
+            setWhatsappNumber(match ? match[1] : waValue);
+          }
+
+          // Custom topup amounts from admin settings
+          const customAmounts = [
+            settings?.topup_amount_1,
+            settings?.topup_amount_2,
+            settings?.topup_amount_3,
+          ].filter(Boolean).map(Number).filter(n => n > 0);
+
+          if (customAmounts.length > 0) {
+            setTopupOptions(customAmounts.map(amount => ({
+              amount,
+              label: `Rp ${amount.toLocaleString("id-ID")}`,
+            })));
+          }
         }
       } catch {
         // ignore
@@ -29,10 +60,11 @@ export default function TopUpPage() {
         setLoading(false);
       }
     }
-    fetchUser();
+    fetchData();
   }, []);
 
   function buildWhatsAppLink(amount: number) {
+    if (!whatsappNumber) return "#";
     const message = `Halo admin, saya mau top up saldo UniverseAI Studio.
 
 Nominal: Rp ${amount.toLocaleString("id-ID")}
@@ -41,7 +73,7 @@ ID Akun: ${user?.id || "-"}
 
 Mohon info pembayaran. Terima kasih!`;
 
-    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
   }
 
   if (loading) {
@@ -64,8 +96,14 @@ Mohon info pembayaran. Terima kasih!`;
         </p>
       </div>
 
+      {!whatsappNumber && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-400">
+          Nomor WhatsApp admin belum dikonfigurasi. Hubungi admin untuk informasi top up.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {TOPUP_OPTIONS.map((opt) => (
+        {topupOptions.map((opt) => (
           <div
             key={opt.amount}
             className="bg-[#141414] border border-[#333] rounded-2xl p-6 flex flex-col items-center text-center"
@@ -76,7 +114,7 @@ Mohon info pembayaran. Terima kasih!`;
               href={buildWhatsAppLink(opt.amount)}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full"
+              className={`w-full ${!whatsappNumber ? 'pointer-events-none opacity-50' : ''}`}
             >
               <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors">
                 <MessageCircle className="w-4 h-4" />

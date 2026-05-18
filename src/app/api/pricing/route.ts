@@ -9,8 +9,14 @@ const PRICING_KEYS = [
   'price_veo_720',
   'price_veo_1080',
   'price_grok_720',
+];
+
+const STRING_KEYS = [
   'whatsapp_admin_link',
   'byok_signup_link',
+  'topup_amount_1',
+  'topup_amount_2',
+  'topup_amount_3',
 ];
 
 /**
@@ -22,14 +28,19 @@ export async function GET() {
   try {
     const rows = await db.select({ key: appSettings.key, value: appSettings.value })
       .from(appSettings)
-      .where(inArray(appSettings.key, PRICING_KEYS));
+      .where(inArray(appSettings.key, [...PRICING_KEYS, ...STRING_KEYS]));
 
     const pricing: Record<string, number> = {};
+    const settings: Record<string, string> = {};
     for (const row of rows) {
-      pricing[row.key] = parseInt(row.value || '0', 10);
+      if (PRICING_KEYS.includes(row.key)) {
+        pricing[row.key] = parseInt(row.value || '0', 10);
+      } else {
+        settings[row.key] = row.value || '';
+      }
     }
 
-    return NextResponse.json({ pricing });
+    return NextResponse.json({ pricing, settings });
   } catch (error) {
     console.error('Pricing API Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
