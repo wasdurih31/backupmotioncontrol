@@ -75,10 +75,12 @@ export async function POST(req: Request) {
     const {
       videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine,
       resolution, duration, negative_prompt, style,
+      aspect_ratio, generate_audio,
     } = await req.json();
 
-    if (!imageUrl || (engine === 'kling' && !videoUrl)) {
-      return NextResponse.json({ error: 'Image (and Video for Kling) URLs are required' }, { status: 400 });
+    // Kling Motion Control v2.6 dan v3 butuh video reference. Kling V3 i2v hanya butuh image.
+    if (!imageUrl || ((engine === 'kling' || engine === 'kling_v3') && !videoUrl)) {
+      return NextResponse.json({ error: 'Image (and Video for Kling Motion Control) URLs are required' }, { status: 400 });
     }
 
     // ── Pre-check slot concurrency user ──
@@ -157,6 +159,38 @@ export async function POST(req: Request) {
         image: imageUrl,
         prompt: prompt,
         duration: duration ? duration.toString() : '5',
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
+      };
+      if (negative_prompt) {
+        (payload as Record<string, unknown>).negative_prompt = negative_prompt;
+      }
+    } else if (engine === 'kling_v3') {
+      // Kling V3 Motion Control via Magnific API
+      endpoint = model === 'pro'
+        ? 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-pro'
+        : 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std';
+
+      payload = {
+        video_url: videoUrl,
+        image_url: imageUrl,
+        prompt: prompt || '',
+        character_orientation: character_orientation || 'video',
+        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+        ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
+      };
+    } else if (engine === 'kling_v3_i2v') {
+      // Kling V3 Image-to-Video via Magnific API
+      endpoint = model === 'pro'
+        ? 'https://api.magnific.com/v1/ai/video/kling-v3-pro'
+        : 'https://api.magnific.com/v1/ai/video/kling-v3-std';
+
+      payload = {
+        start_image_url: imageUrl,
+        prompt: prompt || '',
+        duration: duration ? duration.toString() : '5',
+        aspect_ratio: aspect_ratio || '16:9',
+        generate_audio: generate_audio !== false, // default true
+        cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
         ...(freepikWebhookUrl ? { webhook_url: freepikWebhookUrl } : {}),
       };
       if (negative_prompt) {
@@ -278,7 +312,7 @@ async function cleanupBlobs(urls: (string | null | undefined)[]) {
 }
 
 // ─── PAYG Model Definitions ──────────────────────────────────────────
-type PaygModel = 'kling_std' | 'kling_pro' | 'veo_720' | 'veo_1080' | 'grok_720' | 'wan_2_5';
+type PaygModel = 'kling_std' | 'kling_pro' | 'kling_v3_std' | 'kling_v3_pro' | 'kling_v3_i2v_std' | 'kling_v3_i2v_pro' | 'veo_720' | 'veo_1080' | 'grok_720' | 'wan_2_5';
 
 const PAYG_MODEL_CONFIG: Record<PaygModel, {
   provider: 'freepik' | 'geminigen';
@@ -300,6 +334,34 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
     source: 'payg_freepik_pool',
     engine: 'kling',
     model: 'motion_control_pro',
+  },
+  kling_v3_std: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_v3_std',
+    source: 'payg_freepik_pool',
+    engine: 'kling_v3',
+    model: 'motion_control_std',
+  },
+  kling_v3_pro: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_v3_pro',
+    source: 'payg_freepik_pool',
+    engine: 'kling_v3',
+    model: 'motion_control_pro',
+  },
+  kling_v3_i2v_std: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_v3_i2v_std',
+    source: 'payg_freepik_pool',
+    engine: 'kling_v3_i2v',
+    model: 'std',
+  },
+  kling_v3_i2v_pro: {
+    provider: 'freepik',
+    settingsKey: 'price_kling_v3_i2v_pro',
+    source: 'payg_freepik_pool',
+    engine: 'kling_v3_i2v',
+    model: 'pro',
   },
   veo_720: {
     provider: 'geminigen',
@@ -335,6 +397,7 @@ const PAYG_MODEL_CONFIG: Record<PaygModel, {
 async function handlePaygGenerate(req: Request, userId: string) {
   const {
     videoUrl, imageUrl, prompt, character_orientation, cfg_scale, model, engine, paygModel, duration,
+    aspect_ratio, generate_audio, negative_prompt,
   } = await req.json();
 
   // ── Validate paygModel ──
@@ -347,7 +410,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
   if (!imageUrl) {
     return NextResponse.json({ error: 'Image URL is required.' }, { status: 400 });
   }
-  if ((paygModel === 'kling_std' || paygModel === 'kling_pro') && !videoUrl) {
+  if ((paygModel === 'kling_std' || paygModel === 'kling_pro' || paygModel === 'kling_v3_std' || paygModel === 'kling_v3_pro') && !videoUrl) {
     return NextResponse.json({ error: 'Video URL is required for Kling Motion Control.' }, { status: 400 });
   }
 
@@ -450,8 +513,40 @@ async function handlePaygGenerate(req: Request, userId: string) {
           duration: duration ? duration.toString() : '5',
           ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
         };
+      } else if (paygModel === 'kling_v3_std' || paygModel === 'kling_v3_pro') {
+        // Kling V3 Motion Control via Magnific API
+        endpoint = paygModel === 'kling_v3_pro'
+          ? 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-pro'
+          : 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std';
+
+        payload = {
+          video_url: videoUrl,
+          image_url: imageUrl,
+          prompt: prompt || '',
+          character_orientation: character_orientation || 'video',
+          cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+          ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+        };
+      } else if (paygModel === 'kling_v3_i2v_std' || paygModel === 'kling_v3_i2v_pro') {
+        // Kling V3 Image-to-Video via Magnific API
+        endpoint = paygModel === 'kling_v3_i2v_pro'
+          ? 'https://api.magnific.com/v1/ai/video/kling-v3-pro'
+          : 'https://api.magnific.com/v1/ai/video/kling-v3-std';
+
+        payload = {
+          start_image_url: imageUrl,
+          prompt: prompt || '',
+          duration: duration ? duration.toString() : '5',
+          aspect_ratio: aspect_ratio || '16:9',
+          generate_audio: generate_audio !== false, // default true
+          cfg_scale: typeof cfg_scale === 'number' ? cfg_scale : 0.5,
+          ...(webhookUrl ? { webhook_url: webhookUrl } : {}),
+        };
+        if (negative_prompt) {
+          (payload as Record<string, unknown>).negative_prompt = negative_prompt;
+        }
       } else {
-        // Kling Motion Control via Freepik
+        // Kling V2.6 Motion Control via Freepik
         endpoint = paygModel === 'kling_pro'
           ? 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-pro'
           : 'https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std';

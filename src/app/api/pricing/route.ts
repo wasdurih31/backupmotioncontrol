@@ -6,6 +6,10 @@ import { inArray } from 'drizzle-orm';
 const PRICING_KEYS = [
   'price_kling_std',
   'price_kling_pro',
+  'price_kling_v3_std',
+  'price_kling_v3_pro',
+  'price_kling_v3_i2v_std',
+  'price_kling_v3_i2v_pro',
   'price_veo_720',
   'price_veo_1080',
   'price_grok_720',

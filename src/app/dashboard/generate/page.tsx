@@ -347,14 +347,17 @@ const generateSchema = z.object({
   character_orientation: z.enum(["video", "image"]).optional(),
   cfg_scale: z.number().min(0).max(1).optional(),
   model: z.string().optional(),
-  engine: z.enum(["kling", "pixverse", "kling_2_1_pro", "wan_2_5"]),
+  engine: z.enum(["kling", "kling_v3", "kling_v3_i2v", "pixverse", "kling_2_1_pro", "wan_2_5"]),
   resolution: z.enum(["360p", "540p", "720p", "1080p"]).optional(),
   duration: z.number().optional(),
   negative_prompt: z.string().optional(),
   style: z.string().optional(),
   paygModel: z.string().optional(),
+  aspect_ratio: z.enum(["16:9", "9:16", "1:1"]).optional(),
+  generate_audio: z.boolean().optional(),
 }).refine(data => {
-  if (data.engine !== 'kling' && (!data.prompt || data.prompt.toString().trim() === '')) {
+  // Prompt optional untuk Kling Motion Control (v2.6 dan v3). Wajib untuk model lain.
+  if (data.engine !== 'kling' && data.engine !== 'kling_v3' && (!data.prompt || data.prompt.toString().trim() === '')) {
     return false;
   }
   return true;
@@ -614,7 +617,7 @@ export default function GenerateVideoPage() {
 
     if (isPayg) {
       // PAYG: validate based on selected paygModel
-      const needsVideo = selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro';
+      const needsVideo = selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_std' || selectedPaygModel === 'kling_v3_pro';
       if (needsVideo && (!videoFile || !imageFile)) {
         toast.error("Both a reference video AND a character image are required for Kling.");
         return;
@@ -628,9 +631,13 @@ export default function GenerateVideoPage() {
         return;
       }
       // Override engine for PAYG based on paygModel
-      const engineMap: Record<string, "kling" | "pixverse" | "kling_2_1_pro" | "wan_2_5"> = {
+      const engineMap: Record<string, "kling" | "kling_v3" | "kling_v3_i2v" | "pixverse" | "kling_2_1_pro" | "wan_2_5"> = {
         kling_std: "kling",
         kling_pro: "kling",
+        kling_v3_std: "kling_v3",
+        kling_v3_pro: "kling_v3",
+        kling_v3_i2v_std: "kling_v3_i2v",
+        kling_v3_i2v_pro: "kling_v3_i2v",
         veo_720: "kling", // engine field doesn't matter for PAYG, server uses paygModel
         veo_1080: "kling",
         grok_720: "kling",
@@ -638,11 +645,11 @@ export default function GenerateVideoPage() {
       };
       values.engine = engineMap[selectedPaygModel] || "kling";
       values.paygModel = selectedPaygModel;
-      if (selectedPaygModel === 'kling_pro') values.model = 'pro';
-      else if (selectedPaygModel === 'kling_std') values.model = 'std';
+      if (selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_pro' || selectedPaygModel === 'kling_v3_i2v_pro') values.model = 'pro';
+      else if (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_v3_std' || selectedPaygModel === 'kling_v3_i2v_std') values.model = 'std';
       if (selectedPaygModel === 'grok_720') values.duration = grokDuration;
     } else {
-      if (values.engine === "kling") {
+      if (values.engine === "kling" || values.engine === "kling_v3") {
         if (!videoFile || !imageFile) {
           toast.error("Both a reference video AND a character image are required for Kling.");
           return;
@@ -707,10 +714,12 @@ export default function GenerateVideoPage() {
                   {isPayg ? (
                     /* PAYG Engine Selector — model STD/PRO ada di Configuration card */
                     <Select
-                      value={selectedPaygModel.startsWith('kling') ? 'kling' : selectedPaygModel.startsWith('veo') ? 'veo' : selectedPaygModel.startsWith('wan') ? 'wan_2_5' : 'grok'}
+                      value={selectedPaygModel.startsWith('kling_v3_i2v') ? 'kling_v3_i2v' : selectedPaygModel.startsWith('kling_v3') ? 'kling_v3' : selectedPaygModel.startsWith('kling') ? 'kling' : selectedPaygModel.startsWith('veo') ? 'veo' : selectedPaygModel.startsWith('wan') ? 'wan_2_5' : 'grok'}
                       onValueChange={(val) => {
                         if (!val) return;
                         if (val === 'kling') setSelectedPaygModel('kling_std');
+                        else if (val === 'kling_v3') setSelectedPaygModel('kling_v3_std');
+                        else if (val === 'kling_v3_i2v') setSelectedPaygModel('kling_v3_i2v_std');
                         else if (val === 'veo') setSelectedPaygModel('veo_720');
                         else if (val === 'wan_2_5') setSelectedPaygModel('wan_2_5');
                         else setSelectedPaygModel('grok_720');
@@ -722,7 +731,7 @@ export default function GenerateVideoPage() {
                           <div className="flex flex-col items-start leading-tight">
                             <span className="text-[10px] text-white/40 font-medium uppercase tracking-tighter">PAYG</span>
                             <span className="text-xs font-bold text-foreground">
-                              {selectedPaygModel.startsWith('kling') ? 'Motion Control' : selectedPaygModel.startsWith('veo') ? 'Veo 3.1 Fast' : selectedPaygModel.startsWith('wan') ? 'WAN 2.5 1080p' : 'Grok AI'}
+                              {selectedPaygModel.startsWith('kling_v3_i2v') ? 'Kling V3 I2V' : selectedPaygModel.startsWith('kling_v3') ? 'Motion Control V3' : selectedPaygModel.startsWith('kling') ? 'Motion Control V2.6' : selectedPaygModel.startsWith('veo') ? 'Veo 3.1 Fast' : selectedPaygModel.startsWith('wan') ? 'WAN 2.5 1080p' : 'Grok AI'}
                             </span>
                           </div>
                         </div>
@@ -731,7 +740,13 @@ export default function GenerateVideoPage() {
                         <SelectGroup>
                           <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling AI Engine</SelectLabel>
                           <SelectItem value="kling" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
-                            Motion Control
+                            Motion Control V2.6
+                          </SelectItem>
+                          <SelectItem value="kling_v3" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Motion Control V3
+                          </SelectItem>
+                          <SelectItem value="kling_v3_i2v" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Kling V3 I2V (Image to Video)
                           </SelectItem>
                         </SelectGroup>
                         <SelectGroup>
@@ -766,7 +781,7 @@ export default function GenerateVideoPage() {
                               {field.value === "pixverse" ? "PixVerse" : "Kling"}
                             </span>
                             <span className="text-xs font-bold text-foreground">
-                              {field.value === "kling" ? "Motion Control" : field.value === "kling_2_1_pro" ? "Kling 2.1 Pro" : field.value === "wan_2_5" ? "WAN 2.5 1080p" : "PixVerse V5"}
+                              {field.value === "kling" ? "Motion Control V2.6" : field.value === "kling_v3" ? "Motion Control V3" : field.value === "kling_v3_i2v" ? "Kling V3 I2V" : field.value === "kling_2_1_pro" ? "Kling 2.1 Pro" : field.value === "wan_2_5" ? "WAN 2.5 1080p" : "PixVerse V5"}
                             </span>
                           </div>
                         </div>
@@ -775,7 +790,13 @@ export default function GenerateVideoPage() {
                         <SelectGroup>
                           <SelectLabel className="text-[9px] uppercase tracking-widest text-white/20 px-3 py-2">Kling AI Engine</SelectLabel>
                           <SelectItem value="kling" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
-                            Motion Control
+                            Motion Control V2.6
+                          </SelectItem>
+                          <SelectItem value="kling_v3" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Motion Control V3
+                          </SelectItem>
+                          <SelectItem value="kling_v3_i2v" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
+                            Kling V3 I2V (Image to Video)
                           </SelectItem>
                           <SelectItem value="kling_2_1_pro" className="text-xs py-2.5 cursor-pointer focus:bg-blue-500/10">
                             Kling 2.1 Pro
@@ -800,8 +821,8 @@ export default function GenerateVideoPage() {
                 </div>
               </div>
 
-              <div className={(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") ? "grid grid-cols-2 gap-4" : "block"}>
-                {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") && (
+              <div className={(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_std' || selectedPaygModel === 'kling_v3_pro') : (form.watch("engine") === "kling" || form.watch("engine") === "kling_v3")) ? "grid grid-cols-2 gap-4" : "block"}>
+                {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_std' || selectedPaygModel === 'kling_v3_pro') : (form.watch("engine") === "kling" || form.watch("engine") === "kling_v3")) && (
                   <UploadZone 
                     type="video" 
                     file={videoFile} 
@@ -825,7 +846,7 @@ export default function GenerateVideoPage() {
                 <FormField control={form.control} name="prompt" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
-                      Text Prompt {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro') : form.watch("engine") === "kling") ? "(Optional)" : <span className="text-red-500">*</span>}
+                      Text Prompt {(isPayg ? (selectedPaygModel === 'kling_std' || selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_std' || selectedPaygModel === 'kling_v3_pro') : (form.watch("engine") === "kling" || form.watch("engine") === "kling_v3")) ? "(Optional)" : <span className="text-red-500">*</span>}
                     </FormLabel>
                     <FormControl>
                       <Textarea 
@@ -844,13 +865,13 @@ export default function GenerateVideoPage() {
                 <Card className="bg-card/20 border-border/40 overflow-hidden backdrop-blur-xl shadow-2xl">
                   <CardHeader className="px-5 py-4 border-b border-border/40 bg-white/5 flex flex-row items-center justify-between">
                     <CardTitle className="text-[11px] uppercase tracking-[0.2em] font-black flex items-center gap-2.5 text-white/90">
-                      <div className={`w-1.5 h-1.5 rounded-full ${form.watch("engine") === "kling" ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" : "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.8)]"}`} />
+                      <div className={`w-1.5 h-1.5 rounded-full ${(form.watch("engine") === "kling" || form.watch("engine") === "kling_v3") ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" : "bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.8)]"}`} />
                       Configuration
                     </CardTitle>
                     <Settings className="w-3.5 h-3.5 text-white/30" />
                   </CardHeader>
                   <CardContent className="p-0 divide-y divide-border/30">
-                    {/* PAYG Kling: STD/PRO selector */}
+                    {/* PAYG Kling: STD/PRO selector (works for V2.6, V3 MC, and V3 I2V) */}
                     {isPayg && selectedPaygModel.startsWith('kling') && (
                       <>
                         <div className="grid grid-cols-2 divide-x divide-border/30">
@@ -861,22 +882,51 @@ export default function GenerateVideoPage() {
                                 Model
                               </span>
                               <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-mono border border-blue-500/20 w-fit">
-                                {selectedPaygModel === 'kling_pro' ? 'PREMIUM' : 'STANDARD'}
+                                {(selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_pro' || selectedPaygModel === 'kling_v3_i2v_pro') ? 'PREMIUM' : 'STANDARD'}
                               </span>
                             </div>
-                            <Select value={selectedPaygModel === 'kling_pro' ? 'pro' : 'std'} onValueChange={(val) => {
-                              setSelectedPaygModel(val === 'pro' ? 'kling_pro' : 'kling_std');
-                              form.setValue('paygModel', val === 'pro' ? 'kling_pro' : 'kling_std');
-                            }}>
+                            <Select
+                              value={(selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_pro' || selectedPaygModel === 'kling_v3_i2v_pro') ? 'pro' : 'std'}
+                              onValueChange={(val) => {
+                                const isV3I2V = selectedPaygModel.startsWith('kling_v3_i2v');
+                                const isV3 = selectedPaygModel.startsWith('kling_v3') && !isV3I2V;
+                                let next: string;
+                                if (isV3I2V) {
+                                  next = val === 'pro' ? 'kling_v3_i2v_pro' : 'kling_v3_i2v_std';
+                                } else if (isV3) {
+                                  next = val === 'pro' ? 'kling_v3_pro' : 'kling_v3_std';
+                                } else {
+                                  next = val === 'pro' ? 'kling_pro' : 'kling_std';
+                                }
+                                setSelectedPaygModel(next);
+                                form.setValue('paygModel', next);
+                              }}
+                            >
                               <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
-                                <SelectItem value="std" className="text-xs">STD {pricing.price_kling_std ? `(Rp ${pricing.price_kling_std.toLocaleString('id-ID')})` : ''}</SelectItem>
-                                <SelectItem value="pro" className="text-xs">PRO {pricing.price_kling_pro ? `(Rp ${pricing.price_kling_pro.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                {selectedPaygModel.startsWith('kling_v3_i2v') ? (
+                                  <>
+                                    <SelectItem value="std" className="text-xs">STD {pricing.price_kling_v3_i2v_std ? `(Rp ${pricing.price_kling_v3_i2v_std.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                    <SelectItem value="pro" className="text-xs">PRO {pricing.price_kling_v3_i2v_pro ? `(Rp ${pricing.price_kling_v3_i2v_pro.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                  </>
+                                ) : selectedPaygModel.startsWith('kling_v3') ? (
+                                  <>
+                                    <SelectItem value="std" className="text-xs">STD {pricing.price_kling_v3_std ? `(Rp ${pricing.price_kling_v3_std.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                    <SelectItem value="pro" className="text-xs">PRO {pricing.price_kling_v3_pro ? `(Rp ${pricing.price_kling_v3_pro.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                  </>
+                                ) : (
+                                  <>
+                                    <SelectItem value="std" className="text-xs">STD {pricing.price_kling_std ? `(Rp ${pricing.price_kling_std.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                    <SelectItem value="pro" className="text-xs">PRO {pricing.price_kling_pro ? `(Rp ${pricing.price_kling_pro.toLocaleString('id-ID')})` : ''}</SelectItem>
+                                  </>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
+                          {/* Character orientation: hanya untuk Motion Control (kling, kling_v3), bukan I2V */}
+                          {!selectedPaygModel.startsWith('kling_v3_i2v') && (
                           <FormField control={form.control} name="character_orientation" render={({ field }) => (
                             <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
                               <div className="flex flex-col gap-1.5">
@@ -897,7 +947,63 @@ export default function GenerateVideoPage() {
                               </Select>
                             </FormItem>
                           )} />
+                          )}
+                          {/* I2V config column: duration */}
+                          {selectedPaygModel.startsWith('kling_v3_i2v') && (
+                          <FormField control={form.control} name="duration" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Clock className="w-3 h-3 text-amber-400/70" />
+                                Duration
+                              </FormLabel>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val || "5"))} value={field.value?.toString() || "5"}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  {[3,4,5,6,7,8,9,10,11,12,13,14,15].map(d => (
+                                    <SelectItem key={d} value={d.toString()} className="text-xs">{d} Seconds</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                          )}
                         </div>
+                        {/* I2V extra row: aspect_ratio + generate_audio */}
+                        {selectedPaygModel.startsWith('kling_v3_i2v') && (
+                        <div className="grid grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                          <FormField control={form.control} name="aspect_ratio" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <ImageIcon className="w-3 h-3 text-purple-400/70" />
+                                Aspect Ratio
+                              </FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || "16:9"}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="16:9" className="text-xs">16:9 Landscape</SelectItem>
+                                  <SelectItem value="9:16" className="text-xs">9:16 Portrait</SelectItem>
+                                  <SelectItem value="1:1" className="text-xs">1:1 Square</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="generate_audio" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Sparkles className="w-3 h-3 text-cyan-400/70" />
+                                Audio (Voice)
+                              </FormLabel>
+                              <Select onValueChange={(val) => field.onChange(val === 'true')} value={(field.value !== false).toString()}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="true" className="text-xs">ON (Generate Audio)</SelectItem>
+                                  <SelectItem value="false" className="text-xs">OFF (No Audio)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                        </div>
+                        )}
                         <FormField control={form.control} name="cfg_scale" render={({ field }) => (
                           <FormItem className="p-4 space-y-4 hover:bg-white/[0.02] transition-colors">
                             <div className="flex items-center justify-between">
@@ -957,7 +1063,7 @@ export default function GenerateVideoPage() {
                       </div>
                     )}
                     {/* BYOK Configuration */}
-                    {!isPayg && form.watch("engine") === "kling" ? (
+                    {!isPayg && (form.watch("engine") === "kling" || form.watch("engine") === "kling_v3") ? (
                       <>
                         <div className="grid grid-cols-2 divide-x divide-border/30">
                           <FormField control={form.control} name="model" render={({ field }) => (
@@ -1040,6 +1146,104 @@ export default function GenerateVideoPage() {
                                   <span className="text-[8px] text-white/20 font-bold">MAX</span>
                                 </div>
                               </div>
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </>
+                    ) : form.watch("engine") === "kling_v3_i2v" ? (
+                      <>
+                        {/* BYOK Kling V3 I2V — STD/PRO + duration + aspect_ratio + audio + cfg + negative */}
+                        <div className="grid grid-cols-2 divide-x divide-border/30">
+                          <FormField control={form.control} name="model" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Sparkles className="w-3 h-3 text-blue-400/70" />
+                                Model
+                              </FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || "std"}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="std" className="text-xs">STD (Faster)</SelectItem>
+                                  <SelectItem value="pro" className="text-xs">PRO (Higher Quality)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="duration" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Clock className="w-3 h-3 text-amber-400/70" />
+                                Duration
+                              </FormLabel>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val || "5"))} value={field.value?.toString() || "5"}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  {[3,4,5,6,7,8,9,10,11,12,13,14,15].map(d => (
+                                    <SelectItem key={d} value={d.toString()} className="text-xs">{d} Seconds</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                        </div>
+                        <div className="grid grid-cols-2 divide-x divide-border/30 border-t border-border/30">
+                          <FormField control={form.control} name="aspect_ratio" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <ImageIcon className="w-3 h-3 text-purple-400/70" />
+                                Aspect Ratio
+                              </FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || "16:9"}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="16:9" className="text-xs">16:9 Landscape</SelectItem>
+                                  <SelectItem value="9:16" className="text-xs">9:16 Portrait</SelectItem>
+                                  <SelectItem value="1:1" className="text-xs">1:1 Square</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="generate_audio" render={({ field }) => (
+                            <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors h-full">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Sparkles className="w-3 h-3 text-cyan-400/70" />
+                                Audio (Voice)
+                              </FormLabel>
+                              <Select onValueChange={(val) => field.onChange(val === 'true')} value={(field.value !== false).toString()}>
+                                <FormControl><SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
+                                  <SelectItem value="true" className="text-xs">ON (Generate Audio)</SelectItem>
+                                  <SelectItem value="false" className="text-xs">OFF (No Audio)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormItem>
+                          )} />
+                        </div>
+                        <FormField control={form.control} name="cfg_scale" render={({ field }) => (
+                          <FormItem className="p-4 space-y-4 hover:bg-white/[0.02] transition-colors border-t border-border/30">
+                            <div className="flex items-center justify-between">
+                              <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                                <Terminal className="w-3 h-3 text-green-400/70" />
+                                Guidance Scale
+                              </FormLabel>
+                              <span className="text-[11px] font-mono font-bold text-green-400">{field.value?.toFixed(1)}</span>
+                            </div>
+                            <FormControl>
+                              <div className="px-1 py-1">
+                                <Input type="range" step="0.1" min="0" max="1" className="h-1.5 w-full bg-white/10 rounded-full appearance-none cursor-pointer accent-green-500" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <div className="flex justify-between mt-2 px-0.5"><span className="text-[8px] text-white/20 font-bold">MIN</span><span className="text-[8px] text-white/20 font-bold">MAX</span></div>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="negative_prompt" render={({ field }) => (
+                          <FormItem className="p-4 space-y-3 hover:bg-white/[0.02] transition-colors border-t border-border/30">
+                            <FormLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-2">
+                              <XCircle className="w-3 h-3 text-red-400/70" />
+                              Negative Prompt
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="blur, distort, low quality..." className="bg-black/20 border-border/40 h-9 text-xs focus:border-red-500/30" {...field} />
                             </FormControl>
                           </FormItem>
                         )} />

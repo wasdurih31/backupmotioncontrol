@@ -24,12 +24,14 @@ interface GenerateFormValues {
   character_orientation?: "video" | "image";
   cfg_scale?: number;
   model?: string;
-  engine: "kling" | "pixverse" | "kling_2_1_pro" | "wan_2_5";
+  engine: "kling" | "kling_v3" | "kling_v3_i2v" | "pixverse" | "kling_2_1_pro" | "wan_2_5";
   resolution?: string;
   duration?: number;
   negative_prompt?: string;
   style?: string;
   paygModel?: string;
+  aspect_ratio?: string;
+  generate_audio?: boolean;
 }
 
 export type PollingStatus = "idle" | "polling" | "completed" | "failed";
@@ -124,8 +126,9 @@ const TASK_TIMEOUT_MS = 40 * 60 * 1000;   // 40 menit timeout
 
 /** Cek apakah engine ini motion control (proses lama 8-15 menit). */
 function isMotionControl(engine?: string): boolean {
-  return !engine || engine === 'kling';
-  // engine 'kling' = motion control. Selain itu (pixverse, kling_2_1_pro, veo, grok) = cepat.
+  return !engine || engine === 'kling' || engine === 'kling_v3';
+  // engine 'kling' = motion control v2.6, 'kling_v3' = motion control v3 (magnific).
+  // Selain itu (pixverse, kling_2_1_pro, kling_v3_i2v, veo, grok, wan_2_5) = cepat.
 }
 
 // ─── Helper untuk turunkan UI-compat state dari tasks map ─────────────
@@ -294,7 +297,8 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
     // ── Validasi file ──
     const isPaygNonKling = values.paygModel && !values.paygModel.startsWith('kling');
-    if (values.engine === "kling" && !isPaygNonKling) {
+    const isKlingMC = values.engine === "kling" || values.engine === "kling_v3";
+    if (isKlingMC && !isPaygNonKling) {
       if (!videoFile || !imageFile) return;
     } else {
       if (!imageFile) return;
@@ -358,7 +362,7 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
 
       // ── Step 2: Upload Video (Skip for PixVerse and PAYG non-kling) ──
       let videoBlobUrl: string | undefined;
-      if (values.engine === "kling" && !isPaygNonKling && videoFile) {
+      if (isKlingMC && !isPaygNonKling && videoFile) {
         updateStep("upload_video", "running", "Uploading...");
         addLog("info", `Uploading video to Vercel Blob (${(videoFile.size / 1048576).toFixed(1)} MB)...`);
 
@@ -447,6 +451,8 @@ export const useGenerateStore = create<GenerateState>((set, get) => ({
           negative_prompt: values.negative_prompt,
           style: values.style,
           paygModel: values.paygModel,
+          aspect_ratio: values.aspect_ratio,
+          generate_audio: values.generate_audio,
         }),
       });
 

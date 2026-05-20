@@ -57,7 +57,7 @@ async function runStartupPoll(): Promise<void> {
 
   try {
     // Ambil semua task Freepik yang masih processing
-    const freepikEngines = ['kling', 'kling_pro', 'kling_2_1_pro', 'pixverse', 'wan_2_5'];
+    const freepikEngines = ['kling', 'kling_v3', 'kling_v3_i2v', 'kling_pro', 'kling_2_1_pro', 'pixverse', 'wan_2_5'];
     const pendingTasks = await db.select()
       .from(tasks)
       .where(and(
@@ -117,9 +117,13 @@ async function runStartupPoll(): Promise<void> {
           continue;
         }
 
-        // Poll Freepik
+        // Poll Freepik / Magnific
         const pollingEndpoint = task.engine === 'wan_2_5'
           ? `https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p/${task.id}`
+          : task.engine === 'kling_v3'
+          ? `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-${task.model === 'motion_control_pro' ? 'pro' : 'std'}/${task.id}`
+          : task.engine === 'kling_v3_i2v'
+          ? `https://api.magnific.com/v1/ai/video/kling-v3/${task.id}`
           : task.engine === 'pixverse'
           ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${task.id}`
           : task.engine === 'kling_2_1_pro'
@@ -221,6 +225,10 @@ export async function pollAndUpdateTask(task: DbTask, apiKey: string): Promise<D
 async function pollFreepikTaskLocally(task: DbTask, apiKey: string): Promise<DbTask> {
   const pollingEndpoint = task.engine === 'wan_2_5'
     ? `https://api.magnific.com/v1/ai/image-to-video/wan-2-5-i2v-1080p/${task.id}`
+    : task.engine === 'kling_v3'
+    ? `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-${task.model === 'motion_control_pro' ? 'pro' : 'std'}/${task.id}`
+    : task.engine === 'kling_v3_i2v'
+    ? `https://api.magnific.com/v1/ai/video/kling-v3/${task.id}`
     : task.engine === 'pixverse'
     ? `https://api.freepik.com/v1/ai/image-to-video/pixverse-v5/${task.id}`
     : task.engine === 'kling_2_1_pro'
