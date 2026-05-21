@@ -62,25 +62,37 @@ async function getStickySession(apiKey: string): Promise<StickySession | null> {
     return session;
   }
 
+  // Session expired — coba re-assign proxy yang sama (lebih natural, seperti ISP yang tetap)
+  // Hanya ganti kalau proxy lama sudah tidak aktif di DB
+  const previousProxyId = session?.proxyId || null;
+
   // Session expired or doesn't exist — pick a new proxy from DB
   // Exclude proxies already assigned to other active sessions
   const usedProxyIds = getActiveProxyIds();
+  // Hapus key sendiri dari used set (karena kita sedang re-assign)
+  if (previousProxyId) usedProxyIds.delete(previousProxyId);
 
   try {
     const candidates = await db.select()
       .from(proxyAccounts)
       .where(eq(proxyAccounts.isActive, true))
       .orderBy(asc(proxyAccounts.lastUsedAt))
-      .limit(20); // ambil beberapa untuk filter
+      .limit(20);
 
     if (candidates.length === 0) {
       console.warn('[Proxy] No active proxy accounts in database');
       return null;
     }
 
-    // Pilih proxy pertama yang TIDAK sedang dipakai key lain
-    const proxy = candidates.find(p => !usedProxyIds.has(p.id)) || candidates[0];
-    // Fallback ke candidates[0] kalau semua sudah terpakai (lebih baik share daripada gagal)
+    // Prioritas: 1) proxy yang sama (kalau masih aktif di DB), 2) proxy baru yang belum dipakai
+    let proxy = previousProxyId
+      ? candidates.find(p => p.id === previousProxyId)
+      : undefined;
+
+    if (!proxy) {
+      // Proxy lama tidak tersedia — pilih yang belum dipakai key lain
+      proxy = candidates.find(p => !usedProxyIds.has(p.id)) || candidates[0];
+    }
 
     // Create new ProxyAgent
     const agent = new ProxyAgent(proxy.proxyUrl);
