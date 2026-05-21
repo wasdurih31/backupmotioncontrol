@@ -21,7 +21,7 @@ import { useGenerateStore } from "@/store/useGenerateStore";
 const navLinks = [
   { name: "Home", shortName: "Home", href: "/dashboard", icon: LayoutDashboard },
   { name: "Generate Video", shortName: "Generate", href: "/dashboard/generate", icon: Sparkles },
-  { name: "Prompt Gen", shortName: "Prompt", href: "/dashboard/promptgen", icon: Wand2 },
+  { name: "Prompt Gen", shortName: "Prompt", href: "/dashboard/promptgen", icon: Wand2, byokOnly: true },
   { name: "Top Up", shortName: "Top Up", href: "/dashboard/topup", icon: Wallet, paygOnly: true },
   { name: "Tutorials", shortName: "Tutorials", href: "/dashboard/tutorial", icon: Video },
   { name: "Profile Settings", shortName: "Profile", href: "/dashboard/profile", icon: Settings },
@@ -107,7 +107,11 @@ export default function DashboardLayout({
           </Link>
           
           <nav className="flex items-center gap-1">
-            {navLinks.filter((link) => !('paygOnly' in link && link.paygOnly) || user?.accountType === 'payg').map((link) => {
+            {navLinks.filter((link) => {
+              if ('paygOnly' in link && link.paygOnly && user?.accountType !== 'payg') return false;
+              if ('byokOnly' in link && link.byokOnly && user?.accountType === 'payg') return false;
+              return true;
+            }).map((link) => {
               const isActive = pathname === link.href;
               return (
                 <Link key={link.name} href={link.href} className="block">
@@ -239,7 +243,11 @@ export default function DashboardLayout({
       <nav className="fixed bottom-0 left-0 right-0 md:hidden z-50">
         <div className="bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="flex items-center justify-around px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            {navLinks.filter((link) => !('paygOnly' in link && link.paygOnly) || user?.accountType === 'payg').map((link) => {
+            {navLinks.filter((link) => {
+              if ('paygOnly' in link && link.paygOnly && user?.accountType !== 'payg') return false;
+              if ('byokOnly' in link && link.byokOnly && user?.accountType === 'payg') return false;
+              return true;
+            }).map((link) => {
               const isActive = pathname === link.href;
               const isGenerateLink = link.href === '/dashboard/generate';
               return (
