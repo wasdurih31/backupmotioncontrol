@@ -293,7 +293,8 @@ export default function ProfileSettingsPage() {
       </Card>
       )}
 
-      {/* Google AI Studio (Prompt Generator) */}
+      {/* Google AI Studio (Prompt Generator) — hanya untuk BYOK */}
+      {user.accountType !== 'payg' && (
       <Card className="bg-card/30 border-border/50 relative overflow-hidden">
         <div className="absolute top-0 left-0 -ml-16 -mt-16 w-64 h-64 bg-blue-500/5 blur-3xl rounded-full pointer-events-none" />
         <CardHeader>
@@ -364,6 +365,7 @@ export default function ProfileSettingsPage() {
           </div>
         </CardFooter>
       </Card>
+      )}
     </div>
   );
 }
