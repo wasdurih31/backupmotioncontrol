@@ -27,6 +27,7 @@ interface StickySession {
   proxyUrl: string;
   agent: ProxyAgent;
   startedAt: number; // Date.now()
+  verified: boolean; // true = sudah lolos pre-check, skip pre-check selanjutnya
 }
 
 let _sessions = new Map<string, StickySession>();
@@ -65,6 +66,7 @@ async function getStickySession(apiKey: string): Promise<StickySession | null> {
       proxyUrl: proxy.proxyUrl,
       agent,
       startedAt: now,
+      verified: false, // belum lolos pre-check
     };
     
     _sessions.set(apiKey, session);
@@ -161,8 +163,9 @@ export async function freepikFetch(
   }
 
   // ── Pre-check IP ──
-  // Ping api.magnific.com to ensure the IP isn't blocked by Cloudflare (403) before wasting API quota
-  if (session) {
+  // Hanya pre-check kalau session BELUM verified (baru dibuat atau setelah rotate).
+  // Kalau session sudah verified (lolos sebelumnya), skip — hemat bandwidth & kurangi ban.
+  if (session && !session.verified) {
     let pingAttempts = 0;
     let isVerified = false;
     const maxPingAttempts = 10;
@@ -186,6 +189,8 @@ export async function freepikFetch(
 
         console.log(`[Proxy] ✅ Pre-check PASSED (HTTP ${pingRes.status})`);
         isVerified = true;
+        // Mark session as verified — skip pre-check untuk request selanjutnya
+        session.verified = true;
         break; // Success, exit loop and keep current session
       } catch (e: any) {
         console.warn(`[Proxy] ❌ Pre-check network error: ${e.message} — Rotating...`);
@@ -199,6 +204,9 @@ export async function freepikFetch(
       console.error(`[Proxy] 🚨 Semua ${maxPingAttempts} IP proxy sibuk atau diblokir (403). Mencegah pengiriman tanpa proxy!`);
       throw new Error('Sistem jaringan sedang sibuk. Silakan coba beberapa saat lagi.');
     }
+  } else if (session && session.verified) {
+    // Session sudah verified sebelumnya — skip pre-check
+    console.log(`[Proxy] ⚡ Skipping pre-check (session verified, ${Math.round((Date.now() - session.startedAt) / 1000 / 60)}min old)`);
   }
 
   if (session) {
@@ -228,8 +236,8 @@ export async function freepikFetch(
       const elapsed = Date.now() - startTime;
       console.log(`[Proxy] 📬 Response: HTTP ${response.status} (${elapsed}ms)`);
 
-      // If we get a proxy-related error (407, 502, 503), mark and rotate
-      if (response.status === 407 || response.status === 502 || response.status === 503) {
+      // If we get a proxy-related error (403, 407, 502, 503), mark and rotate on next call
+      if (response.status === 403 || response.status === 407 || response.status === 502 || response.status === 503) {
         console.warn(`[Proxy] ⚠️ Proxy error ${response.status} — will rotate on next call`);
         await markProxyError(apiKey, `HTTP ${response.status} from proxy`);
       }
