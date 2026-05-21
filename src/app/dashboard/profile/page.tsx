@@ -196,10 +196,18 @@ export default function ProfileSettingsPage() {
             <Label>Email / Phone Number</Label>
             <Input value={user.email || user.phone || ""} readOnly className="bg-background/50 text-muted-foreground cursor-not-allowed" />
           </div>
-          <div className="space-y-2">
-            <Label>Access Code</Label>
-            <Input value={user.accessCode} readOnly className="bg-background/50 text-muted-foreground cursor-not-allowed uppercase font-mono" />
-          </div>
+          {user.accountType === 'payg' ? (
+            <div className="space-y-2">
+              <Label>User ID</Label>
+              <p className="text-[11px] text-muted-foreground mb-1">Gunakan User ID ini saat top-up saldo agar terverifikasi otomatis.</p>
+              <Input value={user.id || ""} readOnly className="bg-background/50 text-muted-foreground cursor-not-allowed font-mono text-xs select-all" onClick={(e) => { (e.target as HTMLInputElement).select(); navigator.clipboard.writeText(user.id || '').then(() => { /* silent */ }).catch(() => {}); }} />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Access Code</Label>
+              <Input value={user.accessCode} readOnly className="bg-background/50 text-muted-foreground cursor-not-allowed uppercase font-mono" />
+            </div>
+          )}
           {/* Masa Aktif — hanya untuk BYOK */}
           {user.accountType !== 'payg' && (
             <div className="space-y-2">
