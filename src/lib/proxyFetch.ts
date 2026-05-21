@@ -20,7 +20,7 @@ import { eq, asc, sql } from 'drizzle-orm';
 
 // ─── Sticky session cache ─────────────────────────────────────────────
 // Each proxy is "locked" for STICKY_DURATION_MS before rotating to the next.
-const STICKY_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const STICKY_DURATION_MS = 55 * 60 * 1000; // 55 minutes (match IPRoyal 59min session with safety margin)
 
 interface StickySession {
   proxyId: string;
@@ -239,8 +239,18 @@ export async function freepikFetch(
     console.log('═══════════════════════════════════════════════════════');
 
     try {
+      // Inject browser-like headers untuk mengurangi deteksi bot oleh Cloudflare
+      const browserHeaders: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+      };
+      const mergedHeaders = { ...browserHeaders, ...(init?.headers as Record<string, string> || {}) };
+
       const response = await fetch(url, {
         ...init,
+        headers: mergedHeaders,
         // @ts-ignore — Node.js 18+ supports dispatcher on native fetch via undici
         dispatcher: session.agent,
       });
