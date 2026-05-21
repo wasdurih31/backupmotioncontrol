@@ -233,6 +233,21 @@ export async function POST(req: Request) {
     if (!freepikRes.ok) {
       console.error('Freepik API Error Full:', JSON.stringify(freepikData, null, 2));
       await cleanupBlobs([videoUrl, imageUrl]);
+
+      // Berikan pesan yang jelas untuk BYOK user
+      if (freepikRes.status === 429) {
+        const engineLabel = engine === 'kling' ? `Motion Control ${model === 'pro' ? 'Pro' : 'Std'}`
+          : engine === 'kling_v3' ? `V3 Motion Control ${model === 'pro' ? 'Pro' : 'Std'}`
+          : engine === 'kling_v3_i2v' ? `V3 I2V ${model === 'pro' ? 'Pro' : 'Std'}`
+          : engine === 'kling_2_1_pro' ? 'Kling 2.1 Pro'
+          : engine === 'wan_2_5' ? 'WAN 2.5'
+          : engine === 'pixverse' ? 'PixVerse V5'
+          : engine;
+        return NextResponse.json({
+          error: `Limit harian untuk model ${engineLabel} sudah tercapai. Coba gunakan model lain, atau tunggu reset besok.`,
+        }, { status: 429 });
+      }
+
       return NextResponse.json({
         error: `${freepikData.message || 'Failed to generate video'}: ${JSON.stringify(freepikData)}`,
       }, { status: freepikRes.status });
@@ -461,34 +476,42 @@ async function handlePaygGenerate(req: Request, userId: string) {
     }, { status: 402 });
   }
 
-  // ── Get pool API key (sticky failover) ──
-  const [poolKey] = await db.select()
-    .from(adminVideoKeys)
-    .where(
-      and(
-        eq(adminVideoKeys.provider, config.provider),
-        eq(adminVideoKeys.status, 'active'),
-        eq(adminVideoKeys.isActive, true),
-      ),
-    )
-    .orderBy(asc(adminVideoKeys.lastUsedAt))
-    .limit(1);
+  // ── Get pool API key (per-endpoint limit aware) ──
+  // Tentukan endpoint target dulu agar bisa filter key yang belum limit di endpoint ini
+  let targetEndpoint = '';
+  if (config.provider === 'freepik') {
+    if (paygModel === 'wan_2_5') {
+      targetEndpoint = 'wan-2-5-i2v-1080p';
+    } else if (paygModel === 'kling_v3_std') {
+      targetEndpoint = 'kling-v3-motion-control-std';
+    } else if (paygModel === 'kling_v3_pro') {
+      targetEndpoint = 'kling-v3-motion-control-pro';
+    } else if (paygModel === 'kling_v3_i2v_std') {
+      targetEndpoint = 'kling-v3-std';
+    } else if (paygModel === 'kling_v3_i2v_pro') {
+      targetEndpoint = 'kling-v3-pro';
+    } else if (paygModel === 'kling_pro') {
+      targetEndpoint = 'kling-v2-6-motion-control-pro';
+    } else {
+      targetEndpoint = 'kling-v2-6-motion-control-std';
+    }
+  } else {
+    // geminigen — no per-endpoint limit tracking
+    targetEndpoint = config.engine === 'veo' ? 'geminigen-veo' : 'geminigen-grok';
+  }
 
-  if (!poolKey) {
+  const { getPoolKey, markKeyEndpointLimit, markKeyUsed, markKeyGlobalError } = await import('@/lib/keyPool');
+  const poolKeyResult = await getPoolKey(config.provider as 'freepik' | 'geminigen', targetEndpoint);
+
+  if (!poolKeyResult) {
     await cleanupBlobs([videoUrl, imageUrl]);
     return NextResponse.json({
-      error: 'Server sedang tidak tersedia. Hubungi admin.',
+      error: 'Server sedang tidak tersedia untuk model ini. Coba model lain atau hubungi admin.',
     }, { status: 503 });
   }
 
-  let decryptedKey: string;
-  try {
-    decryptedKey = decrypt(poolKey.apiKeyEncrypted);
-  } catch (e) {
-    console.error('[PAYG] Failed to decrypt pool key:', e);
-    await cleanupBlobs([videoUrl, imageUrl]);
-    return NextResponse.json({ error: 'Server error. Hubungi admin.' }, { status: 500 });
-  }
+  const poolKey = poolKeyResult.raw;
+  const decryptedKey = poolKeyResult.decryptedKey;
 
   // ── Call provider API ──
   let taskId: string | null = null;
@@ -627,19 +650,26 @@ async function handlePaygGenerate(req: Request, userId: string) {
       const errorData = await apiResponse.json().catch(() => ({ message: `HTTP ${apiResponse.status}` }));
       console.error(`[PAYG] API Error (${config.provider}):`, JSON.stringify(errorData, null, 2));
 
-      // Mark key based on HTTP status
-      const newStatus = apiResponse.status === 429 ? 'limit_reached' : 'error';
-      await db.update(adminVideoKeys).set({
-        status: newStatus,
-        lastError: JSON.stringify(errorData).slice(0, 500),
-        errorCount: sql`${adminVideoKeys.errorCount} + 1`,
-      }).where(eq(adminVideoKeys.id, poolKey.id));
+      // Mark key based on HTTP status — per-endpoint for 429, global for auth errors
+      if (apiResponse.status === 429) {
+        // Per-endpoint limit: key masih bisa dipakai untuk endpoint lain
+        await markKeyEndpointLimit(poolKey.id, targetEndpoint);
+      } else if (apiResponse.status === 401 || apiResponse.status === 402 || apiResponse.status === 403) {
+        // Auth/payment error: key globally unusable
+        await markKeyGlobalError(poolKey.id, JSON.stringify(errorData).slice(0, 500));
+      } else {
+        // Other errors: log tapi jangan mark global (bisa transient)
+        await db.update(adminVideoKeys).set({
+          lastError: JSON.stringify(errorData).slice(0, 500),
+          errorCount: sql`${adminVideoKeys.errorCount} + 1`,
+        }).where(eq(adminVideoKeys.id, poolKey.id));
+      }
 
       await cleanupBlobs([videoUrl, imageUrl]);
       // User-facing error tanpa expose provider name
       let userMessage = 'Generate gagal. ';
       if (apiResponse.status === 429) {
-        userMessage += 'Server sedang sibuk. Coba lagi dalam beberapa menit.';
+        userMessage += 'Server sedang sibuk untuk model ini. Coba model lain atau coba lagi nanti.';
       } else if (apiResponse.status === 400) {
         userMessage += 'File atau prompt tidak valid. Pastikan gambar/video sesuai format.';
       } else if (apiResponse.status === 402 || apiResponse.status === 403) {
@@ -753,10 +783,7 @@ async function handlePaygGenerate(req: Request, userId: string) {
   }
 
   // ── Mark key as used ──
-  await db.update(adminVideoKeys).set({
-    usageCount: sql`${adminVideoKeys.usageCount} + 1`,
-    lastUsedAt: new Date(),
-  }).where(eq(adminVideoKeys.id, poolKey.id));
+  await markKeyUsed(poolKey.id);
 
   // ── Increment totalGenerate ──
   await db.update(users)

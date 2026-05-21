@@ -150,3 +150,17 @@ export const proxyAccounts = pgTable('proxy_accounts', {
   lastError: text('last_error'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+// ─── Tracking limit per-key per-endpoint (daily reset) ───────────────
+// Magnific limit adalah per-endpoint per-key (bukan global).
+// Contoh: KEY-1 bisa limit di kling-mc-std tapi masih bisa di kling-mc-pro.
+// Record auto-expire setelah 24 jam (limit harian reset).
+export const keyEndpointLimits = pgTable('key_endpoint_limits', {
+  id: text('id').primaryKey(),
+  keyId: text('key_id').references(() => adminVideoKeys.id).notNull(),
+  // Identifier endpoint yang kena limit, e.g. 'kling-v2-6-motion-control-std'
+  endpoint: varchar('endpoint', { length: 200 }).notNull(),
+  limitedAt: timestamp('limited_at').defaultNow().notNull(),
+  // Auto-expire: biasanya limitedAt + 24 jam
+  expiresAt: timestamp('expires_at').notNull(),
+});
