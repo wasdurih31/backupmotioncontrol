@@ -36,8 +36,10 @@ const SETTING_GROUPS: SettingGroup[] = [
       { key: "byok_signup_link", label: "Link Pendaftaran BYOK", placeholder: "https://link-pendaftaran.com", description: "Link tujuan saat user klik 'Daftar BYOK' di landing page." },
       { key: "topup_support_text", label: "Teks Support (Top Up)", placeholder: "💬 Hubungi Admin Support", description: "Teks yang tampil di halaman top-up." },
       { key: "topup_support_link", label: "Link Support (Top Up)", placeholder: "https://wa.me/628xxx", description: "URL tujuan saat user klik teks support." },
+      { key: "topup_support_icon", label: "Icon Support (URL gambar)", placeholder: "https://cdn.example.com/whatsapp-icon.png", description: "URL gambar icon untuk tombol support (opsional)." },
       { key: "topup_tutorial_text", label: "Teks Tutorial (Top Up)", placeholder: "📖 Lihat Tutorial Top Up", description: "Teks yang tampil di halaman top-up." },
       { key: "topup_tutorial_link", label: "Link Tutorial (Top Up)", placeholder: "https://youtube.com/watch?v=xxx", description: "URL tujuan saat user klik teks tutorial." },
+      { key: "topup_tutorial_icon", label: "Icon Tutorial (URL gambar)", placeholder: "https://cdn.example.com/youtube-icon.png", description: "URL gambar icon untuk tombol tutorial (opsional)." },
     ],
   },
   {

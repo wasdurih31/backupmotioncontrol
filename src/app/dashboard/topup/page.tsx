@@ -17,8 +17,10 @@ export default function TopUpPage() {
   const [copied, setCopied] = useState(false);
   const [supportText, setSupportText] = useState("");
   const [supportLink, setSupportLink] = useState("");
+  const [supportIcon, setSupportIcon] = useState("");
   const [tutorialText, setTutorialText] = useState("");
   const [tutorialLink, setTutorialLink] = useState("");
+  const [tutorialIcon, setTutorialIcon] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -65,8 +67,10 @@ export default function TopUpPage() {
           // Support & Tutorial
           setSupportText(settings?.topup_support_text || '');
           setSupportLink(settings?.topup_support_link || '');
+          setSupportIcon(settings?.topup_support_icon || '');
           setTutorialText(settings?.topup_tutorial_text || '');
           setTutorialLink(settings?.topup_tutorial_link || '');
+          setTutorialIcon(settings?.topup_tutorial_icon || '');
         }
       } catch {
         // ignore
@@ -210,9 +214,14 @@ export default function TopUpPage() {
               href={supportLink || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-center px-4 py-3 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 transition-colors text-sm text-muted-foreground hover:text-foreground"
+              className="flex-1 flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 hover:border-blue-500/30 transition-all group"
             >
-              {supportText}
+              {supportIcon && (
+                <img src={supportIcon} alt="" className="w-6 h-6 rounded object-contain shrink-0" />
+              )}
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                {supportText}
+              </span>
             </a>
           )}
           {tutorialText && (
@@ -220,9 +229,14 @@ export default function TopUpPage() {
               href={tutorialLink || '#'}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-center px-4 py-3 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 transition-colors text-sm text-muted-foreground hover:text-foreground"
+              className="flex-1 flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 hover:border-purple-500/30 transition-all group"
             >
-              {tutorialText}
+              {tutorialIcon && (
+                <img src={tutorialIcon} alt="" className="w-6 h-6 rounded object-contain shrink-0" />
+              )}
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                {tutorialText}
+              </span>
             </a>
           )}
         </div>
