@@ -25,6 +25,10 @@ const STRING_KEYS = [
   'topup_link_1',
   'topup_link_2',
   'topup_link_3',
+  'topup_support_text',
+  'topup_support_link',
+  'topup_tutorial_text',
+  'topup_tutorial_link',
 ];
 
 /**

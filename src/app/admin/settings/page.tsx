@@ -75,6 +75,10 @@ const SETTING_GROUPS: SettingGroup[] = [
       { key: "topup_link_1", label: "Link Top Up Nominal 1", placeholder: "https://lynk.id/username/product-slug-1", description: "Link checkout Lynk.id untuk nominal pertama (sesuai topup_amount_1)." },
       { key: "topup_link_2", label: "Link Top Up Nominal 2", placeholder: "https://lynk.id/username/product-slug-2", description: "Link checkout Lynk.id untuk nominal kedua (sesuai topup_amount_2)." },
       { key: "topup_link_3", label: "Link Top Up Nominal 3", placeholder: "https://lynk.id/username/product-slug-3", description: "Link checkout Lynk.id untuk nominal ketiga (sesuai topup_amount_3)." },
+      { key: "topup_support_text", label: "Teks Support Admin", placeholder: "Hubungi Admin Support", description: "Teks tombol/link support yang tampil di halaman top-up. Bisa berisi link." },
+      { key: "topup_support_link", label: "Link Support Admin", placeholder: "https://wa.me/628xxx", description: "URL tujuan saat user klik teks support (WhatsApp, Telegram, dll)." },
+      { key: "topup_tutorial_text", label: "Teks Tutorial Top Up", placeholder: "Lihat Tutorial Top Up", description: "Teks tombol/link tutorial yang tampil di halaman top-up." },
+      { key: "topup_tutorial_link", label: "Link Tutorial Top Up", placeholder: "https://youtube.com/watch?v=xxx", description: "URL tujuan saat user klik teks tutorial (YouTube, artikel, dll)." },
     ],
   },
 ];

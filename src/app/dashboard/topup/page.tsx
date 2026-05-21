@@ -15,6 +15,10 @@ export default function TopUpPage() {
   const [loading, setLoading] = useState(true);
   const [topupOptions, setTopupOptions] = useState<{ amount: number; label: string; link: string }[]>([]);
   const [copied, setCopied] = useState(false);
+  const [supportText, setSupportText] = useState("");
+  const [supportLink, setSupportLink] = useState("");
+  const [tutorialText, setTutorialText] = useState("");
+  const [tutorialLink, setTutorialLink] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -57,6 +61,12 @@ export default function TopUpPage() {
               link: links[i] || '',
             })));
           }
+
+          // Support & Tutorial
+          setSupportText(settings?.topup_support_text || '');
+          setSupportLink(settings?.topup_support_link || '');
+          setTutorialText(settings?.topup_tutorial_text || '');
+          setTutorialLink(settings?.topup_tutorial_link || '');
         }
       } catch {
         // ignore
@@ -191,6 +201,32 @@ export default function TopUpPage() {
           </div>
         ))}
       </div>
+
+      {/* Support & Tutorial Links */}
+      {(supportText || tutorialText) && (
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {supportText && (
+            <a
+              href={supportLink || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center px-4 py-3 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 transition-colors text-sm text-muted-foreground hover:text-foreground"
+            >
+              {supportText}
+            </a>
+          )}
+          {tutorialText && (
+            <a
+              href={tutorialLink || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center px-4 py-3 rounded-xl border border-[#333] bg-[#141414] hover:bg-white/5 transition-colors text-sm text-muted-foreground hover:text-foreground"
+            >
+              {tutorialText}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
