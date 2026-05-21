@@ -218,12 +218,13 @@ function TaskCardsGrid() {
 
               {/* Body */}
               {t.status === "polling" && (
-                <div className="px-4 py-8 flex flex-col items-center justify-center text-center">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full border-2 border-blue-500/30 border-t-blue-400 animate-spin" />
-                    <Play className="w-4 h-4 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-3">Generating video...</p>
+                <div className="px-4 py-6 flex flex-col items-center justify-center text-center">
+                  <img
+                    src="https://i.ibb.co.com/Y7mcvnmp/STK-20260424-WA0011.webp"
+                    alt="Loading"
+                    className="w-20 h-20 object-contain"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">Generating video...</p>
                   <p className="text-[10px] text-white/30 mt-1 font-mono">{fmtElapsed(elapsed)}</p>
                 </div>
               )}
