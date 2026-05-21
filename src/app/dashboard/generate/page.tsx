@@ -122,70 +122,152 @@ function ProcessMonitor({ steps, logs, isOpen, onToggle, isRunning }: {
 
 // ─── Result Section (compact card) ───────────────────────────────────
 function ResultSection() {
-  const pollingStatus = useGenerateStore((s) => s.pollingStatus);
-  const resultVideoUrl = useGenerateStore((s) => s.resultVideoUrl);
-  const activeTaskId = useGenerateStore((s) => s.activeTaskId);
-  const clearResult = useGenerateStore((s) => s.clearResult);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  return null; // Replaced by TaskCardsGrid
+}
 
-  if (pollingStatus === "idle" && !activeTaskId) return null;
+// ─── Task Cards Grid — semua task tampil sebagai kartu visual ────────
+function TaskCardsGrid() {
+  const tasks = useGenerateStore((s) => s.tasks);
+  const dismissTask = useGenerateStore((s) => s.dismissTask);
+  const triggerGalleryRefresh = useGenerateStore((s) => s.triggerGalleryRefresh);
+
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const list = useMemo(
+    () => Object.values(tasks).sort((a, b) => b.startedAt - a.startedAt),
+    [tasks],
+  );
+
+  if (list.length === 0) return null;
+
+  const fmtElapsed = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m > 0 ? `${m}m ${r}s` : `${r}s`;
+  };
+
+  const engineLabel = (engine?: string) => {
+    switch (engine) {
+      case 'kling': return 'MC V2.6';
+      case 'kling_v3': return 'MC V3';
+      case 'kling_v3_i2v': return 'V3 I2V';
+      case 'kling_2_1_pro': return 'Kling 2.1';
+      case 'pixverse': return 'PixVerse';
+      case 'wan_2_5': return 'WAN 2.5';
+      case 'veo': return 'Veo 3.1';
+      case 'grok': return 'Grok AI';
+      default: return engine || 'Unknown';
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      {pollingStatus === "polling" && (
-        <div className="rounded-xl border border-blue-500/10 bg-black/40 backdrop-blur-sm overflow-hidden min-h-[300px] flex items-center justify-center">
-          <LoadingOverlay isVisible={pollingStatus === "polling"} />
-        </div>
-      )}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+          Proses Generate
+        </h3>
+        <span className="text-[10px] font-mono text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
+          {list.filter((t) => t.status === "polling").length}/{MAX_CONCURRENT_TASKS} slot
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {list.map((t) => {
+          const elapsed = nowMs - t.startedAt;
+          return (
+            <div
+              key={t.taskId}
+              className={`rounded-xl border overflow-hidden transition-all ${
+                t.status === "polling"
+                  ? "border-blue-500/20 bg-blue-500/5"
+                  : t.status === "completed"
+                  ? "border-green-500/20 bg-card/30"
+                  : "border-red-500/20 bg-red-500/5"
+              }`}
+            >
+              {/* Header */}
+              <div className="px-3 py-2 flex items-center justify-between border-b border-border/20">
+                <div className="flex items-center gap-2">
+                  {t.status === "polling" && <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
+                  {t.status === "completed" && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
+                  {t.status === "failed" && <XCircle className="w-3.5 h-3.5 text-red-400" />}
+                  <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                    {engineLabel(t.engine)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {t.status === "polling" ? fmtElapsed(elapsed) : t.taskId.slice(0, 6)}
+                  </span>
+                  {t.status !== "polling" && (
+                    <button
+                      type="button"
+                      onClick={() => dismissTask(t.taskId)}
+                      className="text-muted-foreground hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
 
-      {pollingStatus === "completed" && resultVideoUrl && (
-        <div className="rounded-xl border border-green-500/20 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl">
-          <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
-              <span className="text-sm font-medium text-green-300">Generation Complete</span>
+              {/* Body */}
+              {t.status === "polling" && (
+                <div className="px-4 py-8 flex flex-col items-center justify-center text-center">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full border-2 border-blue-500/30 border-t-blue-400 animate-spin" />
+                    <Play className="w-4 h-4 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">Generating video...</p>
+                  <p className="text-[10px] text-white/30 mt-1 font-mono">{fmtElapsed(elapsed)}</p>
+                </div>
+              )}
+
+              {t.status === "completed" && t.resultUrl && (
+                <div>
+                  <div className="relative bg-black">
+                    <video
+                      src={t.resultUrl}
+                      className="w-full aspect-video object-contain"
+                      controls
+                      playsInline
+                      muted
+                    />
+                  </div>
+                  <div className="p-2.5 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleSmartDownload(t.resultUrl!, `universeai-${t.taskId.slice(0, 8)}.mp4`, e as any)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white text-black text-xs font-bold hover:bg-white/90 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {t.status === "completed" && !t.resultUrl && (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-xs text-amber-400">Video expired atau tidak tersedia</p>
+                </div>
+              )}
+
+              {t.status === "failed" && (
+                <div className="px-4 py-6 flex flex-col items-center text-center">
+                  <XCircle className="w-8 h-8 text-red-400/60 mb-2" />
+                  <p className="text-xs text-red-300">Generate gagal</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Coba lagi dengan input berbeda</p>
+                </div>
+              )}
             </div>
-            <span className="text-[10px] text-muted-foreground font-mono">Result ID: {activeTaskId?.slice(0, 8)}</span>
-          </div>
-          <div className="relative bg-black cursor-pointer group" onClick={() => {
-            if (videoRef.current) {
-              if (document.fullscreenElement) document.exitFullscreen();
-              else videoRef.current.requestFullscreen().catch(() => {});
-            }
-          }}>
-            <video ref={videoRef} src={resultVideoUrl} className="w-full aspect-video object-contain" controls autoPlay loop playsInline muted />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-black/20">
-               <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full text-xs text-white border border-white/20">Click for Fullscreen</div>
-            </div>
-          </div>
-          <div className="p-4 flex gap-3">
-            <Button type="button" size="lg" className="flex-1 bg-white text-black hover:bg-white/90 font-bold gap-2 text-sm shadow-lg shadow-white/5" onClick={(e) => handleSmartDownload(resultVideoUrl, `universeai-${activeTaskId?.slice(0, 8)}.mp4`, e)}>
-              <Download className="w-4 h-4" /> Download Video
-            </Button>
-            <Button type="button" size="lg" variant="outline" className="flex-1 border-border/50 bg-transparent hover:bg-white/5 gap-2 text-sm" onClick={clearResult}>
-              <RefreshCw className="w-4 h-4" /> Generate New
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground text-center pb-4 px-4 italic">The video will be automatically deleted after 30 minutes.</p>
-        </div>
-      )}
-
-      {pollingStatus === "completed" && !resultVideoUrl && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-sm p-10 text-center">
-          <p className="text-lg font-medium text-foreground mb-2">Video processed but URL not available</p>
-          <p className="text-sm text-muted-foreground mb-6">The video may have expired or was removed from storage.</p>
-          <Button type="button" size="lg" variant="outline" className="border-border/50 gap-2 px-8" onClick={clearResult}><RefreshCw className="w-4 h-4" /> Try Again</Button>
-        </div>
-      )}
-
-      {pollingStatus === "failed" && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-10 text-center">
-          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <p className="text-lg font-medium text-foreground mb-2">Video generation failed</p>
-          <p className="text-sm text-muted-foreground mb-6">Something went wrong on the Freepik side. Please try again with different inputs.</p>
-          <Button type="button" size="lg" variant="outline" className="border-border/50 gap-2 px-8" onClick={clearResult}><RefreshCw className="w-4 h-4" /> Try Again</Button>
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -255,90 +337,9 @@ function GallerySection() {
   );
 }
 
-// ─── Active Tasks List — menampilkan semua task yang sedang diproses ──
+// ─── Active Tasks List — replaced by TaskCardsGrid ──
 function ActiveTasksList() {
-  const tasks = useGenerateStore((s) => s.tasks);
-  const focusedTaskId = useGenerateStore((s) => s.focusedTaskId);
-  const focusTask = useGenerateStore((s) => s.focusTask);
-  const dismissTask = useGenerateStore((s) => s.dismissTask);
-
-  // Tick setiap detik untuk update "elapsed" di UI tanpa memanggil Date.now()
-  // selama render (yang tidak pure).
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const list = useMemo(
-    () => Object.values(tasks).sort((a, b) => b.startedAt - a.startedAt),
-    [tasks],
-  );
-
-  if (list.length === 0) return null;
-
-  const fmtElapsed = (ms: number) => {
-    const s = Math.max(0, Math.floor(ms / 1000));
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return m > 0 ? `${m}m ${r}s` : `${r}s`;
-  };
-
-  return (
-    <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-amber-400" />
-          <span className="text-sm font-medium text-foreground">Proses Berjalan</span>
-          <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
-            {list.filter((t) => t.status === "polling").length}/{MAX_CONCURRENT_TASKS}
-          </span>
-        </div>
-      </div>
-      <div className="divide-y divide-border/20">
-        {list.map((t) => {
-          const isFocused = t.taskId === focusedTaskId;
-          const elapsed = nowMs - t.startedAt;
-          return (
-            <div
-              key={t.taskId}
-              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isFocused ? "bg-blue-500/5" : "hover:bg-white/[0.03]"}`}
-              onClick={() => focusTask(t.taskId)}
-            >
-              <div className="shrink-0">
-                {t.status === "polling" && <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />}
-                {t.status === "completed" && <CheckCircle2 className="w-4 h-4 text-green-400" />}
-                {t.status === "failed" && <XCircle className="w-4 h-4 text-red-400" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-foreground truncate">{t.taskId.slice(0, 12)}...</span>
-                  {t.engine && (
-                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-white/50">
-                      {t.engine}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {t.status === "polling" ? `Running · ${fmtElapsed(elapsed)}` : t.status === "completed" ? "Selesai" : "Gagal"}
-                </span>
-              </div>
-              {t.status !== "polling" && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); dismissTask(t.taskId); }}
-                  className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors"
-                  aria-label="Dismiss"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 // ─── Main Page ───────────────────────────────────────────────────────
@@ -903,7 +904,10 @@ export default function GenerateVideoPage() {
                               }}
                             >
                               <SelectTrigger className="bg-black/20 border-border/40 h-9 text-xs">
-                                <SelectValue />
+                                <span>
+                                  {(selectedPaygModel === 'kling_pro' || selectedPaygModel === 'kling_v3_pro' || selectedPaygModel === 'kling_v3_i2v_pro') ? 'PRO' : 'STD'}
+                                  {currentCost > 0 && <span className="text-green-400 ml-1.5">(Rp {currentCost.toLocaleString('id-ID')})</span>}
+                                </span>
                               </SelectTrigger>
                               <SelectContent className="bg-background/95 backdrop-blur-xl border-border/40">
                                 {selectedPaygModel.startsWith('kling_v3_i2v') ? (
@@ -1540,7 +1544,7 @@ export default function GenerateVideoPage() {
               </div>
             )}
             <ActiveTasksList />
-            <div ref={resultSectionRef}><ResultSection /></div>
+            <div ref={resultSectionRef}><TaskCardsGrid /></div>
             <GallerySection />
           </div>
           
