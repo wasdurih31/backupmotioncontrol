@@ -14,9 +14,10 @@
 
 // Minimum jeda antar call Freepik (ms). Permintaan baru akan menunggu hingga
 // jarak ini terpenuhi dari call sebelumnya.
-const MIN_INTERVAL_MS = 1500;
+const MIN_INTERVAL_MS = 3000;
 // Tambahan jitter acak 0..MAX_JITTER_MS agar pola tidak konstan.
-const MAX_JITTER_MS = 1500;
+// Total delay: 3-10 detik (humanized, tidak terlalu cepat tapi tidak terlalu lambat)
+const MAX_JITTER_MS = 7000;
 
 let chain: Promise<unknown> = Promise.resolve();
 let lastCallAt = 0;

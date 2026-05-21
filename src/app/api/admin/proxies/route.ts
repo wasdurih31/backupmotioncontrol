@@ -119,13 +119,19 @@ export async function PUT(req: Request) {
   return NextResponse.json({ success: true });
 }
 
-/** DELETE — Remove single proxy */
+/** DELETE — Remove single proxy or all proxies (?all=true) */
 export async function DELETE(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const url = new URL(req.url);
+  const deleteAll = url.searchParams.get('all');
   const id = url.searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
+  if (deleteAll === 'true') {
+    await db.delete(proxyAccounts);
+    return NextResponse.json({ success: true, deleted: 'all' });
+  }
+
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   await db.delete(proxyAccounts).where(eq(proxyAccounts.id, id));
   return NextResponse.json({ success: true });
 }

@@ -73,6 +73,15 @@ export default function AdminProxies() {
     } catch { toast.error("Gagal hapus"); }
   }
 
+  async function handleDeleteAll() {
+    if (!confirm(`Hapus SEMUA ${proxies.length} proxy? Ini tidak bisa di-undo.`)) return;
+    try {
+      await fetch(`/api/admin/proxies?all=true`, { method: "DELETE" });
+      setProxies([]);
+      toast.success("Semua proxy dihapus");
+    } catch { toast.error("Gagal hapus"); }
+  }
+
   function startEditLabel(proxy: ProxyAccount) {
     setEditingId(proxy.id);
     setEditLabel(proxy.label || "");
@@ -114,6 +123,11 @@ export default function AdminProxies() {
         <button onClick={() => { setLoading(true); fetchProxies(); }} className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5 transition-colors">
           <RefreshCcw className="w-4 h-4" />
         </button>
+        {proxies.length > 0 && (
+          <button onClick={handleDeleteAll} className="px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/10 border border-red-500/20 transition-colors flex items-center gap-1.5">
+            <Trash2 className="w-3.5 h-3.5" /> Hapus Semua
+          </button>
+        )}
       </div>
 
       {/* Stats */}
