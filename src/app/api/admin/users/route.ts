@@ -114,7 +114,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const { id, isActive, subscriptionEnd, subscriptionStart, identifier, accessCode } = await req.json();
+    const { id, isActive, subscriptionEnd, subscriptionStart, identifier, accessCode, resetApiKey } = await req.json();
 
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
@@ -122,6 +122,7 @@ export async function PATCH(req: Request) {
     if (isActive !== undefined) updateData.isActive = isActive;
     if (subscriptionEnd !== undefined) updateData.subscriptionEnd = subscriptionEnd ? new Date(subscriptionEnd) : null;
     if (subscriptionStart !== undefined) updateData.subscriptionStart = subscriptionStart ? new Date(subscriptionStart) : null;
+    if (resetApiKey === true) updateData.apiKey = null;
     
     let processedEmail = null;
     let processedPhone = null;

@@ -173,6 +173,25 @@ export default function AdminUsersPage() {
     }
   };
 
+  const resetApiKey = async (id: string) => {
+    if (!confirm("Reset API Key user ini? User harus input ulang key baru di Profile Settings.")) return;
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, resetApiKey: true }),
+      });
+      if (res.ok) {
+        toast.success("API Key berhasil di-reset. User perlu input key baru.");
+        fetchUsers();
+      } else {
+        toast.error("Gagal reset API Key");
+      }
+    } catch (e) {
+      toast.error("Action failed");
+    }
+  };
+
   const deleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to PERMANENTLY delete this user? This cannot be undone.")) return;
     try {
@@ -434,6 +453,14 @@ export default function AdminUsersPage() {
                               <Calendar className="w-4 h-4 text-amber-400" /> Modify User Data
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-border/50 mx-1" />
+                            {user.accountType === 'byok' && (
+                            <DropdownMenuItem 
+                              onClick={() => resetApiKey(user.id)}
+                              className="text-amber-400 cursor-pointer gap-2 rounded-lg py-2 focus:text-amber-400 focus:bg-amber-400/10"
+                            >
+                              <Key className="w-4 h-4" /> Reset API Key
+                            </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => toggleStatus(user.id, user.isActive)}
                               className={`cursor-pointer gap-2 rounded-lg py-2 ${user.isActive ? 'text-orange-400 focus:text-orange-400 focus:bg-orange-400/10' : 'text-green-400 focus:text-green-400 focus:bg-green-400/10'}`}
