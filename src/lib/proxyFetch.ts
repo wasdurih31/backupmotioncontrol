@@ -33,9 +33,25 @@ interface StickySession {
 let _sessions = new Map<string, StickySession>();
 
 /**
+ * Get proxy IDs yang sedang aktif dipakai oleh key lain.
+ * Mencegah 2 key berbeda mendapat proxy yang sama (collision).
+ */
+function getActiveProxyIds(): Set<string> {
+  const now = Date.now();
+  const activeIds = new Set<string>();
+  for (const [, session] of _sessions) {
+    if ((now - session.startedAt) < STICKY_DURATION_MS) {
+      activeIds.add(session.proxyId);
+    }
+  }
+  return activeIds;
+}
+
+/**
  * Get or create a sticky proxy session for a specific API Key.
  * Uses the least-recently-used active proxy from the database.
- * Sticks to the same proxy for ~30 minutes per API key.
+ * Ensures no two keys share the same proxy (anti-collision).
+ * Sticks to the same proxy for ~55 minutes per API key.
  */
 async function getStickySession(apiKey: string): Promise<StickySession | null> {
   const now = Date.now();
@@ -47,17 +63,24 @@ async function getStickySession(apiKey: string): Promise<StickySession | null> {
   }
 
   // Session expired or doesn't exist — pick a new proxy from DB
+  // Exclude proxies already assigned to other active sessions
+  const usedProxyIds = getActiveProxyIds();
+
   try {
-    const [proxy] = await db.select()
+    const candidates = await db.select()
       .from(proxyAccounts)
       .where(eq(proxyAccounts.isActive, true))
       .orderBy(asc(proxyAccounts.lastUsedAt))
-      .limit(1);
+      .limit(20); // ambil beberapa untuk filter
 
-    if (!proxy) {
+    if (candidates.length === 0) {
       console.warn('[Proxy] No active proxy accounts in database');
       return null;
     }
+
+    // Pilih proxy pertama yang TIDAK sedang dipakai key lain
+    const proxy = candidates.find(p => !usedProxyIds.has(p.id)) || candidates[0];
+    // Fallback ke candidates[0] kalau semua sudah terpakai (lebih baik share daripada gagal)
 
     // Create new ProxyAgent
     const agent = new ProxyAgent(proxy.proxyUrl);
