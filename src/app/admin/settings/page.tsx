@@ -65,6 +65,18 @@ const SETTING_GROUPS: SettingGroup[] = [
       { key: "price_wan_2_5", label: "WAN 2.5 1080p", placeholder: "1500", description: "Per generate WAN 2.5 1080p." },
     ],
   },
+  {
+    id: "topup_links",
+    title: "Link Top Up (Lynk.id)",
+    subtitle: "Link checkout Lynk.id untuk setiap nominal top-up PAYG.",
+    icon: Link2,
+    accent: "text-emerald-400",
+    fields: [
+      { key: "topup_link_1", label: "Link Top Up Nominal 1", placeholder: "https://lynk.id/username/product-slug-1", description: "Link checkout Lynk.id untuk nominal pertama (sesuai topup_amount_1)." },
+      { key: "topup_link_2", label: "Link Top Up Nominal 2", placeholder: "https://lynk.id/username/product-slug-2", description: "Link checkout Lynk.id untuk nominal kedua (sesuai topup_amount_2)." },
+      { key: "topup_link_3", label: "Link Top Up Nominal 3", placeholder: "https://lynk.id/username/product-slug-3", description: "Link checkout Lynk.id untuk nominal ketiga (sesuai topup_amount_3)." },
+    ],
+  },
 ];
 
 export default function AdminSettingsPage() {

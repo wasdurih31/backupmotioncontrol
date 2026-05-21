@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wallet, MessageCircle, Copy, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
+import { Loader2, Wallet, Copy, CheckCircle2, AlertCircle, CreditCard, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_TOPUP_OPTIONS = [
@@ -13,8 +13,7 @@ const DEFAULT_TOPUP_OPTIONS = [
 export default function TopUpPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [whatsappNumber, setWhatsappNumber] = useState("");
-  const [topupOptions, setTopupOptions] = useState(DEFAULT_TOPUP_OPTIONS);
+  const [topupOptions, setTopupOptions] = useState<{ amount: number; label: string; link: string }[]>([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -33,22 +32,29 @@ export default function TopUpPage() {
         if (pricingRes.ok) {
           const { settings } = await pricingRes.json();
 
-          if (settings?.whatsapp_admin_link) {
-            const waValue = settings.whatsapp_admin_link;
-            const match = waValue.match(/(\d{10,15})/);
-            setWhatsappNumber(match ? match[1] : waValue);
-          }
-
-          const customAmounts = [
+          // Build topup options from admin settings
+          const amounts = [
             settings?.topup_amount_1,
             settings?.topup_amount_2,
             settings?.topup_amount_3,
-          ].filter(Boolean).map(Number).filter(n => n > 0);
+          ].map(Number).filter(n => n > 0);
 
-          if (customAmounts.length > 0) {
-            setTopupOptions(customAmounts.map(amount => ({
+          const links = [
+            settings?.topup_link_1 || '',
+            settings?.topup_link_2 || '',
+            settings?.topup_link_3 || '',
+          ];
+
+          if (amounts.length > 0) {
+            setTopupOptions(amounts.map((amount, i) => ({
               amount,
               label: `Rp ${amount.toLocaleString("id-ID")}`,
+              link: links[i] || '',
+            })));
+          } else {
+            setTopupOptions(DEFAULT_TOPUP_OPTIONS.map((opt, i) => ({
+              ...opt,
+              link: links[i] || '',
             })));
           }
         }
@@ -72,19 +78,6 @@ export default function TopUpPage() {
     });
   }
 
-  function buildWhatsAppLink(amount: number) {
-    if (!whatsappNumber) return "#";
-    const message = `Halo admin, saya mau top up saldo UniverseAI Studio.
-
-Nominal: Rp ${amount.toLocaleString("id-ID")}
-Email: ${user?.email || "-"}
-User ID: ${user?.id || "-"}
-
-Mohon info pembayaran. Terima kasih!`;
-
-    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -92,6 +85,8 @@ Mohon info pembayaran. Terima kasih!`;
       </div>
     );
   }
+
+  const hasAnyLink = topupOptions.some(opt => opt.link);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -105,7 +100,7 @@ Mohon info pembayaran. Terima kasih!`;
         </p>
       </div>
 
-      {/* User ID Card — penting untuk verifikasi */}
+      {/* User ID Card */}
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
         <div className="flex items-start gap-3">
           <CreditCard className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
@@ -139,15 +134,15 @@ Mohon info pembayaran. Terima kasih!`;
         <ol className="text-sm text-[#a3a3a3] space-y-2.5 list-none">
           <li className="flex gap-3">
             <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">1</span>
-            <span>Pilih nominal top up di bawah, lalu klik untuk membayar</span>
+            <span>Salin <strong className="text-foreground">User ID</strong> di atas</span>
           </li>
           <li className="flex gap-3">
             <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">2</span>
-            <span>Di halaman pembayaran, isi <strong className="text-foreground">Email</strong> dan <strong className="text-foreground">User ID</strong> dengan benar</span>
+            <span>Pilih nominal dan klik <strong className="text-foreground">Bayar Sekarang</strong></span>
           </li>
           <li className="flex gap-3">
             <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">3</span>
-            <span>Selesaikan pembayaran sesuai metode yang tersedia</span>
+            <span>Di halaman pembayaran, isi <strong className="text-foreground">Email</strong> dan paste <strong className="text-foreground">User ID</strong></span>
           </li>
           <li className="flex gap-3">
             <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">4</span>
@@ -162,9 +157,9 @@ Mohon info pembayaran. Terima kasih!`;
       </div>
 
       {/* Nominal Options */}
-      {!whatsappNumber && (
+      {!hasAnyLink && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-400">
-          Sistem pembayaran belum dikonfigurasi. Hubungi admin.
+          Link pembayaran belum dikonfigurasi. Hubungi admin.
         </div>
       )}
 
@@ -176,17 +171,23 @@ Mohon info pembayaran. Terima kasih!`;
           >
             <p className="text-2xl font-bold mb-1">{opt.label}</p>
             <p className="text-xs text-[#a3a3a3] mb-6">Top up saldo</p>
-            <a
-              href={buildWhatsAppLink(opt.amount)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`w-full ${!whatsappNumber ? 'pointer-events-none opacity-50' : ''}`}
-            >
-              <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition-colors">
-                <MessageCircle className="w-4 h-4" />
-                WhatsApp Admin
+            {opt.link ? (
+              <a
+                href={opt.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full"
+              >
+                <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors">
+                  <ExternalLink className="w-4 h-4" />
+                  Bayar Sekarang
+                </button>
+              </a>
+            ) : (
+              <button disabled className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/10 text-muted-foreground font-semibold cursor-not-allowed opacity-50">
+                Belum tersedia
               </button>
-            </a>
+            )}
           </div>
         ))}
       </div>
