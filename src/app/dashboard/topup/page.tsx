@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wallet, MessageCircle } from "lucide-react";
+import { Loader2, Wallet, MessageCircle, Copy, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
+import { toast } from "sonner";
 
 const DEFAULT_TOPUP_OPTIONS = [
   { amount: 10000, label: "Rp 10.000" },
@@ -14,11 +15,11 @@ export default function TopUpPage() {
   const [loading, setLoading] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [topupOptions, setTopupOptions] = useState(DEFAULT_TOPUP_OPTIONS);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch user profile and settings in parallel
         const [userRes, pricingRes] = await Promise.all([
           fetch("/api/user/profile"),
           fetch("/api/pricing"),
@@ -32,15 +33,12 @@ export default function TopUpPage() {
         if (pricingRes.ok) {
           const { settings } = await pricingRes.json();
 
-          // WhatsApp number from admin settings
           if (settings?.whatsapp_admin_link) {
-            // Support both formats: full link (https://wa.me/628xxx) or just number (628xxx)
             const waValue = settings.whatsapp_admin_link;
             const match = waValue.match(/(\d{10,15})/);
             setWhatsappNumber(match ? match[1] : waValue);
           }
 
-          // Custom topup amounts from admin settings
           const customAmounts = [
             settings?.topup_amount_1,
             settings?.topup_amount_2,
@@ -63,13 +61,24 @@ export default function TopUpPage() {
     fetchData();
   }, []);
 
+  function handleCopyUserId() {
+    if (!user?.id) return;
+    navigator.clipboard.writeText(user.id).then(() => {
+      setCopied(true);
+      toast.success("User ID disalin!");
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast.error("Gagal menyalin");
+    });
+  }
+
   function buildWhatsAppLink(amount: number) {
     if (!whatsappNumber) return "#";
     const message = `Halo admin, saya mau top up saldo UniverseAI Studio.
 
 Nominal: Rp ${amount.toLocaleString("id-ID")}
 Email: ${user?.email || "-"}
-ID Akun: ${user?.id || "-"}
+User ID: ${user?.id || "-"}
 
 Mohon info pembayaran. Terima kasih!`;
 
@@ -92,13 +101,70 @@ Mohon info pembayaran. Terima kasih!`;
           Top Up Saldo
         </h1>
         <p className="text-sm text-[#a3a3a3] mt-1">
-          Pilih nominal top up, lalu hubungi admin via WhatsApp untuk pembayaran.
+          Isi saldo untuk generate video. Pembayaran otomatis terverifikasi.
         </p>
       </div>
 
+      {/* User ID Card — penting untuk verifikasi */}
+      <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <CreditCard className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">User ID Anda</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Salin dan masukkan User ID ini saat pembayaran agar saldo otomatis masuk.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-3 py-2.5 rounded-lg bg-black/40 border border-blue-500/30 font-mono text-sm text-blue-300 truncate select-all">
+            {user?.id || "-"}
+          </div>
+          <button
+            onClick={handleCopyUserId}
+            className="px-3 py-2.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <span className="text-xs font-medium">{copied ? "Disalin" : "Salin"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Instruksi */}
+      <div className="bg-[#141414] border border-[#333] rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400" />
+          <p className="text-sm font-semibold text-foreground">Cara Top Up (Otomatis)</p>
+        </div>
+        <ol className="text-sm text-[#a3a3a3] space-y-2.5 list-none">
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">1</span>
+            <span>Pilih nominal top up di bawah, lalu klik untuk membayar</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">2</span>
+            <span>Di halaman pembayaran, isi <strong className="text-foreground">Email</strong> dan <strong className="text-foreground">User ID</strong> dengan benar</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">3</span>
+            <span>Selesaikan pembayaran sesuai metode yang tersedia</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white">4</span>
+            <span>Saldo <strong className="text-green-400">otomatis masuk</strong> setelah pembayaran berhasil</span>
+          </li>
+        </ol>
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 mt-2">
+          <p className="text-xs text-amber-300">
+            ⚠️ Pastikan User ID yang diisi <strong>sama persis</strong> dengan yang tertera di atas. Jika salah, saldo tidak akan masuk otomatis.
+          </p>
+        </div>
+      </div>
+
+      {/* Nominal Options */}
       {!whatsappNumber && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-400">
-          Nomor WhatsApp admin belum dikonfigurasi. Hubungi admin untuk informasi top up.
+          Sistem pembayaran belum dikonfigurasi. Hubungi admin.
         </div>
       )}
 
@@ -106,7 +172,7 @@ Mohon info pembayaran. Terima kasih!`;
         {topupOptions.map((opt) => (
           <div
             key={opt.amount}
-            className="bg-[#141414] border border-[#333] rounded-2xl p-6 flex flex-col items-center text-center"
+            className="bg-[#141414] border border-[#333] rounded-2xl p-6 flex flex-col items-center text-center hover:border-blue-500/30 transition-colors"
           >
             <p className="text-2xl font-bold mb-1">{opt.label}</p>
             <p className="text-xs text-[#a3a3a3] mb-6">Top up saldo</p>
@@ -123,18 +189,6 @@ Mohon info pembayaran. Terima kasih!`;
             </a>
           </div>
         ))}
-      </div>
-
-      <div className="bg-[#141414] border border-[#333] rounded-xl p-4">
-        <p className="text-sm text-[#a3a3a3]">
-          <strong className="text-[#e5e5e5]">Cara top up:</strong>
-        </p>
-        <ol className="text-sm text-[#a3a3a3] mt-2 space-y-1 list-decimal list-inside">
-          <li>Pilih nominal top up di atas</li>
-          <li>Klik tombol WhatsApp untuk menghubungi admin</li>
-          <li>Lakukan pembayaran sesuai instruksi admin</li>
-          <li>Saldo akan ditambahkan setelah pembayaran dikonfirmasi</li>
-        </ol>
       </div>
     </div>
   );
