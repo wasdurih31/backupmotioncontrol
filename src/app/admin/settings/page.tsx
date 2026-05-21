@@ -255,8 +255,8 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Tombol "Save All" hanya muncul di tab Pricing */}
-        {isPricingTab && (
+        {/* Tombol "Save All" untuk semua tab kecuali yang per-field */}
+        {(isPricingTab || currentGroup.id === 'links' || currentGroup.id === 'topup_links') && (
           <button
             onClick={() => handleSaveGroup(currentGroup)}
             disabled={savingAll || dirtyCount === 0}
@@ -325,33 +325,32 @@ export default function AdminSettingsPage() {
           })}
         </div>
       ) : (
-        // Tab Links: tetap per-field save untuk URL (lebih hati-hati)
-        <div className="space-y-4">
-          {currentGroup.fields.map((field) => (
-            <div key={field.key} className="bg-card/30 border border-border/50 rounded-xl p-5 space-y-3">
-              <div>
-                <label className="text-sm font-medium text-foreground">{field.label}</label>
-                <p className="text-xs text-muted-foreground mt-0.5">{field.description}</p>
-              </div>
-              <div className="flex gap-2">
+        // Tab Links / Topup Links: compact rows, 1 save button di header
+        <div className="bg-card/30 border border-border/50 rounded-xl overflow-hidden divide-y divide-border/40">
+          {currentGroup.fields.map((field) => {
+            const isDirty = (settings[field.key] || "") !== (originalSettings[field.key] || "");
+            return (
+              <div
+                key={field.key}
+                className={`flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 transition-colors ${
+                  isDirty ? "bg-amber-500/5" : "hover:bg-white/[0.02]"
+                }`}
+              >
+                <div className="sm:w-44 shrink-0">
+                  <span className="text-xs font-medium text-foreground">{field.label}</span>
+                </div>
                 <input
                   type="text"
                   value={settings[field.key] || ""}
                   onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
                   placeholder={field.placeholder}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-black/30 border border-border/50 text-foreground placeholder:text-muted-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  className={`flex-1 px-3 py-1.5 rounded-md bg-black/30 border text-foreground placeholder:text-muted-foreground text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 ${
+                    isDirty ? "border-amber-500/50" : "border-border/40"
+                  }`}
                 />
-                <button
-                  onClick={() => handleSaveOne(field.key)}
-                  disabled={saving === field.key}
-                  className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shrink-0"
-                >
-                  {saving === field.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
