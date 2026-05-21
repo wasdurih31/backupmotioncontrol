@@ -13,9 +13,11 @@ export default function ValidateKeyPage() {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("kling_2_5_pro");
   const [count, setCount] = useState(1);
-  const [delay, setDelay] = useState(3);
+  const [delayMin, setDelayMin] = useState(1);
+  const [delayMax, setDelayMax] = useState(10);
   
   const [loading, setLoading] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
@@ -30,6 +32,7 @@ export default function ValidateKeyPage() {
     }
 
     setLoading(true);
+    setStopped(false);
     setResults([]);
     setProgress({ current: 0, total: count });
 
@@ -49,24 +52,33 @@ export default function ValidateKeyPage() {
         setResults((prev) => [newResult, ...prev]);
 
         if (res.ok) {
-          toast.success(`Validasi ${i + 1} berhasil`);
+          toast.success(`Request #${i + 1} berhasil`);
         } else {
-          toast.error(`Validasi ${i + 1} gagal`);
+          toast.error(`Request #${i + 1} gagal (${res.status})`);
+          // Auto-stop: jika error 429 (limit) atau 401/403 (key mati), stop testing
+          if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
+            toast.error(`⛔ Auto-stop: API key limit/error terdeteksi. Menghentikan testing.`);
+            setStopped(true);
+            break;
+          }
         }
       } catch (e: any) {
         setResults((prev) => [{ error: e.message, status: 500, index: i + 1, timestamp: new Date().toLocaleTimeString() }, ...prev]);
-        toast.error(`Validasi ${i + 1} error`);
+        toast.error(`Request #${i + 1} network error — stopping`);
+        setStopped(true);
+        break;
       }
 
-      // Delay before next request (if not the last one)
+      // Random delay before next request (if not the last one)
       if (i < count - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay * 1000));
+        const randomDelay = delayMin + Math.random() * (delayMax - delayMin);
+        await new Promise(resolve => setTimeout(resolve, randomDelay * 1000));
       }
     }
 
     setLoading(false);
     setProgress({ current: 0, total: 0 });
-    toast.success("Semua proses validasi selesai");
+    if (!stopped) toast.success("Semua proses validasi selesai");
   }
 
   return (
@@ -128,15 +140,28 @@ export default function ValidateKeyPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-3 h-3" /> Delay (Detik)
+                  <Clock className="w-3 h-3" /> Random Delay (Detik)
                 </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={delay}
-                  onChange={(e) => setDelay(parseInt(e.target.value) || 1)}
-                  className="bg-black/20"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={delayMin}
+                    onChange={(e) => setDelayMin(parseInt(e.target.value) || 1)}
+                    className="bg-black/20 w-20 text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">—</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={delayMax}
+                    onChange={(e) => setDelayMax(parseInt(e.target.value) || 10)}
+                    className="bg-black/20 w-20 text-center"
+                  />
+                  <span className="text-[10px] text-muted-foreground">detik</span>
+                </div>
               </div>
             </div>
             
