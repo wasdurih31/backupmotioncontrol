@@ -34,13 +34,22 @@ const SETTING_GROUPS: SettingGroup[] = [
     fields: [
       { key: "whatsapp_admin_link", label: "Link WhatsApp Admin", placeholder: "https://wa.me/628123456789", description: "Link WhatsApp untuk kontak admin." },
       { key: "byok_signup_link", label: "Link Pendaftaran BYOK", placeholder: "https://link-pendaftaran.com", description: "Link tujuan saat user klik 'Daftar BYOK' di landing page." },
-      { key: "topup_link_1", label: "Link Top Up Nominal 1", placeholder: "https://lynk.id/username/product-1", description: "Link checkout untuk nominal pertama." },
-      { key: "topup_link_2", label: "Link Top Up Nominal 2", placeholder: "https://lynk.id/username/product-2", description: "Link checkout untuk nominal kedua." },
-      { key: "topup_link_3", label: "Link Top Up Nominal 3", placeholder: "https://lynk.id/username/product-3", description: "Link checkout untuk nominal ketiga." },
       { key: "topup_support_text", label: "Teks Support (Top Up)", placeholder: "💬 Hubungi Admin Support", description: "Teks yang tampil di halaman top-up." },
       { key: "topup_support_link", label: "Link Support (Top Up)", placeholder: "https://wa.me/628xxx", description: "URL tujuan saat user klik teks support." },
       { key: "topup_tutorial_text", label: "Teks Tutorial (Top Up)", placeholder: "📖 Lihat Tutorial Top Up", description: "Teks yang tampil di halaman top-up." },
       { key: "topup_tutorial_link", label: "Link Tutorial (Top Up)", placeholder: "https://youtube.com/watch?v=xxx", description: "URL tujuan saat user klik teks tutorial." },
+    ],
+  },
+  {
+    id: "topup_links",
+    title: "Link Checkout Top Up",
+    subtitle: "Link checkout Lynk.id untuk setiap nominal top-up PAYG.",
+    icon: DollarSign,
+    accent: "text-emerald-400",
+    fields: [
+      { key: "topup_link_1", label: "Link Top Up Nominal 1", placeholder: "https://lynk.id/username/product-1", description: "Link checkout untuk nominal pertama." },
+      { key: "topup_link_2", label: "Link Top Up Nominal 2", placeholder: "https://lynk.id/username/product-2", description: "Link checkout untuk nominal kedua." },
+      { key: "topup_link_3", label: "Link Top Up Nominal 3", placeholder: "https://lynk.id/username/product-3", description: "Link checkout untuk nominal ketiga." },
     ],
   },
   {
