@@ -174,25 +174,37 @@ export async function freepikFetch(
       pingAttempts++;
       try {
         console.log(`[Proxy] 🔍 Pre-checking IP with api.magnific.com (Attempt ${pingAttempts}/${maxPingAttempts})...`);
+        const controller = new AbortController();
         const pingRes = await fetch('https://api.magnific.com', {
-          method: 'GET',
+          method: 'HEAD', // HEAD = no response body, hanya status code
+          signal: controller.signal,
           // @ts-ignore
           dispatcher: session.agent,
         });
+
+        // Abort body stream segera — kita hanya butuh status code
+        controller.abort();
 
         if (pingRes.status === 403 || pingRes.status === 407 || pingRes.status >= 500) {
           console.warn(`[Proxy] ❌ Pre-check FAILED (HTTP ${pingRes.status}) — IP blocked. Rotating...`);
           await markProxyError(apiKey, `Precheck HTTP ${pingRes.status}`);
           session = await getStickySession(apiKey);
-          continue; // Try again with new session
+          continue;
         }
 
         console.log(`[Proxy] ✅ Pre-check PASSED (HTTP ${pingRes.status})`);
         isVerified = true;
-        // Mark session as verified — skip pre-check untuk request selanjutnya
         session.verified = true;
-        break; // Success, exit loop and keep current session
+        break;
       } catch (e: any) {
+        // AbortError dari controller.abort() — abaikan, itu expected
+        if (e.name === 'AbortError') {
+          // Ini terjadi kalau abort dipanggil sebelum response selesai — masih sukses
+          console.log(`[Proxy] ✅ Pre-check PASSED (aborted body)`);
+          isVerified = true;
+          if (session) session.verified = true;
+          break;
+        }
         console.warn(`[Proxy] ❌ Pre-check network error: ${e.message} — Rotating...`);
         await markProxyError(apiKey, `Precheck network error`);
         session = await getStickySession(apiKey);
